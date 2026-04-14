@@ -50,13 +50,7 @@ async function fetchHAEntity(entityId) {
     headers['Authorization'] = `Bearer ${SUPERVISOR_TOKEN}`;
   }
   const url = `${HA_API_BASE}/states/${entityId}`;
-  console.log(`  [HA API] GET ${url}`);
   const res = await axios.get(url, { headers });
-  console.log(`  [HA API] Response status: ${res.status}`);
-  console.log(`  [HA API] Entity: ${entityId}`);
-  console.log(`  [HA API]   state: ${JSON.stringify(res.data.state)}`);
-  console.log(`  [HA API]   attributes keys: ${Object.keys(res.data.attributes || {}).join(', ')}`);
-  console.log(`  [HA API]   attributes: ${JSON.stringify(res.data.attributes, null, 2)}`);
   return res.data;
 }
 
@@ -67,42 +61,21 @@ async function fetchHAForecast(entityId, type = 'daily') {
     headers['Authorization'] = `Bearer ${SUPERVISOR_TOKEN}`;
   }
   const url = `${HA_API_BASE}/services/weather/get_forecasts?return_response`;
-  console.log(`  [HA API] POST ${url} (entity: ${entityId}, type: ${type})`);
   const res = await axios.post(url, {
     entity_id: entityId,
     type: type,
   }, { headers });
-  console.log(`  [HA API] get_forecasts response status: ${res.status}`);
-  console.log(`  [HA API] raw response keys: ${JSON.stringify(Object.keys(res.data))}`);
-  console.log(`  [HA API] raw response (truncated): ${JSON.stringify(res.data).substring(0, 500)}`);
   // HA REST API wraps service responses in "service_response"
   const data = res.data.service_response || res.data.response || res.data;
   const entityData = data[entityId] || data;
   const forecastList = Array.isArray(entityData.forecast) ? entityData.forecast : Array.isArray(entityData) ? entityData : [];
-  console.log(`  [HA API] forecast entries returned: ${forecastList.length}`);
-  if (forecastList.length > 0) {
-    console.log(`    first: ${JSON.stringify(forecastList[0])}`);
-    if (forecastList.length > 1) {
-      console.log(`    second: ${JSON.stringify(forecastList[1])}`);
-    }
-  }
   return forecastList;
 }
 
 // Fetch weather data from Home Assistant entities
 async function fetchWeatherFromHA(forecastEntity, stationEntity) {
-  // Get forecast entity (Pirate Weather) for current conditions
-  console.log(`  Fetching forecast entity: ${forecastEntity}`);
   const forecast = await fetchHAEntity(forecastEntity);
   const fAttr = forecast.attributes;
-
-  console.log(`  Forecast state: ${forecast.state}`);
-  console.log(`  Forecast attributes:`);
-  console.log(`    temperature: ${fAttr.temperature}`);
-  console.log(`    apparent_temperature: ${fAttr.apparent_temperature}`);
-  console.log(`    humidity: ${fAttr.humidity}`);
-  console.log(`    wind_speed: ${fAttr.wind_speed}`);
-  console.log(`    pressure: ${fAttr.pressure}`);
 
   // Build current conditions from forecast entity as baseline
   const currently = {
@@ -120,11 +93,11 @@ async function fetchWeatherFromHA(forecastEntity, stationEntity) {
     try {
       const station = await fetchHAEntity(stationEntity);
       const sAttr = station.attributes;
+      currently.forecastIcon = currently.icon; // preserve pirateweather icon
       currently.icon = mapHAConditionToIcon(station.state);
       if (sAttr.temperature !== undefined) currently.temperature = sAttr.temperature;
-      console.log(`  Station override: icon=${currently.icon}, temp=${currently.temperature}°F`);
     } catch (e) {
-      console.error(`  Could not fetch station entity: ${e.message}`);
+      console.error(`Could not fetch station entity: ${e.message}`);
     }
   }
 
@@ -141,11 +114,7 @@ async function fetchWeatherFromHA(forecastEntity, stationEntity) {
       });
     }
   } catch (e) {
-    console.error(`  Could not fetch forecast: ${e.message}`);
-    if (e.response) {
-      console.error(`  Response status: ${e.response.status}`);
-      console.error(`  Response data: ${JSON.stringify(e.response.data)}`);
-    }
+    console.error(`Could not fetch forecast: ${e.message}`);
   }
 
   // Ensure we have at least a "today" entry
@@ -156,12 +125,6 @@ async function fetchWeatherFromHA(forecastEntity, stationEntity) {
       temperatureHigh: currently.temperature,
       temperatureLow: currently.temperature,
     });
-  }
-
-  console.log(`  Parsed currently: ${JSON.stringify(currently)}`);
-  console.log(`  Parsed dailyData (${dailyData.length} days):`);
-  for (const d of dailyData) {
-    console.log(`    ${JSON.stringify(d)}`);
   }
 
   return {
@@ -534,7 +497,11 @@ async function createWeatherImage(currentData, dailyData, isAnimationFrame2 = fa
   
   // Main section: Animated weather icon and temperature
   // Icon on left, temp on right
-  const weatherIcon = await loadWeatherIcon(currentData.icon, isAnimationFrame2);
+  // Frame 1: station icon, Frame 2: pirateweather forecast icon (no alt)
+  const currentIconName = isAnimationFrame2 && currentData.forecastIcon
+    ? currentData.forecastIcon
+    : currentData.icon;
+  const weatherIcon = await loadWeatherIcon(currentIconName, false);
   if (weatherIcon) {
     image.composite(weatherIcon, Math.floor(2), Math.floor(11));
   } else {

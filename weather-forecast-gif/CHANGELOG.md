@@ -1,22 +1,20 @@
 # Changelog
 
-## 1.0.3
+## 1.1.0
 
-- Fix: Add `?return_response` to `get_forecasts` service call (required by HA for response-returning services)
-
-## 1.0.2
-
-- Fix: Station entity now only overrides icon and current temperature (humidity, wind, pressure come from forecast entity)
-- Fix: Use `weather.get_forecasts` service for daily forecast data (HA 2024.3+ removed forecast attribute)
-
-## 1.0.1
-
-- Dev release
+- Fix: Station entity now only overrides icon and current temperature
+- Fix: Fetch daily forecast via `weather.get_forecasts` service (HA 2024.3+ compatibility)
+- Fix: Unwrap `service_response` key from HA REST API response
+- Feature: Main weather icon animates between station condition and PirateWeather forecast condition
+- Forecast column icons continue to use alt-frame animation
+- Removed verbose debug logging
 
 ## 1.0.0
 
 - Initial release as Home Assistant add-on
 - Generates animated 64×64 weather forecast GIF
 - Supports separate forecast and station weather entities
+- Built-in web server for serving the GIF
+- Refreshes every minute on the minute
 - Built-in web server for serving the GIF
 - Refreshes every minute on the minute
