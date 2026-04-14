@@ -7,3 +7,7 @@
 - Supports separate forecast and station weather entities
 - Built-in web server for serving the GIF
 - Refreshes every minute on the minute
+
+## 1.0.1
+
+- Dev release

@@ -7,7 +7,6 @@ const path = require('path');
 const Jimp = require('jimp');
 const cron = require('node-cron');
 const express = require('express');
-const os = require('os');
 
 // Home Assistant add-on configuration
 const HA_API_BASE = (process.env.SUPERVISOR_URI || 'http://supervisor/core') + '/api';
@@ -50,15 +49,38 @@ async function fetchHAEntity(entityId) {
   if (SUPERVISOR_TOKEN) {
     headers['Authorization'] = `Bearer ${SUPERVISOR_TOKEN}`;
   }
-  const res = await axios.get(`${HA_API_BASE}/states/${entityId}`, { headers });
+  const url = `${HA_API_BASE}/states/${entityId}`;
+  console.log(`  [HA API] GET ${url}`);
+  const res = await axios.get(url, { headers });
+  console.log(`  [HA API] Response status: ${res.status}`);
+  console.log(`  [HA API] Entity: ${entityId}`);
+  console.log(`  [HA API]   state: ${JSON.stringify(res.data.state)}`);
+  console.log(`  [HA API]   attributes keys: ${Object.keys(res.data.attributes || {}).join(', ')}`);
+  console.log(`  [HA API]   attributes: ${JSON.stringify(res.data.attributes, null, 2)}`);
   return res.data;
 }
 
 // Fetch weather data from Home Assistant entities
 async function fetchWeatherFromHA(forecastEntity, stationEntity) {
   // Get forecast entity (Pirate Weather) for forecast + fallback current conditions
+  console.log(`  Fetching forecast entity: ${forecastEntity}`);
   const forecast = await fetchHAEntity(forecastEntity);
   const fAttr = forecast.attributes;
+
+  console.log(`  Forecast state: ${forecast.state}`);
+  console.log(`  Forecast attributes:`);
+  console.log(`    temperature: ${fAttr.temperature}`);
+  console.log(`    apparent_temperature: ${fAttr.apparent_temperature}`);
+  console.log(`    humidity: ${fAttr.humidity}`);
+  console.log(`    wind_speed: ${fAttr.wind_speed}`);
+  console.log(`    pressure: ${fAttr.pressure}`);
+  console.log(`    forecast entries: ${(fAttr.forecast || []).length}`);
+  if (fAttr.forecast && fAttr.forecast.length > 0) {
+    console.log(`    first forecast entry: ${JSON.stringify(fAttr.forecast[0])}`);
+    if (fAttr.forecast.length > 1) {
+      console.log(`    second forecast entry: ${JSON.stringify(fAttr.forecast[1])}`);
+    }
+  }
 
   // Build current conditions from forecast entity as baseline
   const currently = {
@@ -140,6 +162,12 @@ async function fetchWeatherFromHA(forecastEntity, stationEntity) {
       temperatureHigh: currently.temperature,
       temperatureLow: currently.temperature,
     });
+  }
+
+  console.log(`  Parsed currently: ${JSON.stringify(currently)}`);
+  console.log(`  Parsed dailyData (${dailyData.length} days):`);
+  for (const d of dailyData) {
+    console.log(`    ${JSON.stringify(d)}`);
   }
 
   return {
@@ -825,19 +853,8 @@ async function main() {
     
     // Start web server
     app.listen(PORT, '0.0.0.0', () => {
-      const interfaces = os.networkInterfaces();
-      let localIP = 'localhost';
-      for (const name of Object.keys(interfaces)) {
-        for (const iface of interfaces[name]) {
-          if (iface.family === 'IPv4' && !iface.internal) {
-            localIP = iface.address;
-            break;
-          }
-        }
-        if (localIP !== 'localhost') break;
-      }
-      console.log(`Web server running at http://localhost:${PORT}/`);
-      console.log(`Access from network: http://${localIP}:${PORT}/`);
+      console.log(`Web server running on port ${PORT}`);
+      console.log(`Access the GIF at http://<your-ha-ip>:${PORT}/`);
     });
     
     // Run once on startup
