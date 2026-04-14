@@ -73,10 +73,12 @@ async function fetchHAForecast(entityId, type = 'daily') {
     type: type,
   }, { headers });
   console.log(`  [HA API] get_forecasts response status: ${res.status}`);
-  // Response is keyed by entity_id
-  const data = res.data;
+  console.log(`  [HA API] raw response keys: ${JSON.stringify(Object.keys(res.data))}`);
+  console.log(`  [HA API] raw response (truncated): ${JSON.stringify(res.data).substring(0, 500)}`);
+  // HA REST API wraps service responses in a "response" key
+  const data = res.data.response || res.data;
   const entityData = data[entityId] || data;
-  const forecastList = entityData.forecast || [];
+  const forecastList = entityData.forecast || entityData || [];
   console.log(`  [HA API] forecast entries returned: ${forecastList.length}`);
   if (forecastList.length > 0) {
     console.log(`    first: ${JSON.stringify(forecastList[0])}`);
