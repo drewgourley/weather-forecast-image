@@ -5,7 +5,7 @@ profile weather_forecast_gif flags=(attach_disconnected,mediate_deleted) {
 
   # Capabilities
   file,
-  signal (send) set=(s6-svscan, s6-supervise, cont, term, kill),
+  signal (send) set=(kill,term,int,hup,cont),
 
   # S6-Overlay
   /init ix,
@@ -14,16 +14,15 @@ profile weather_forecast_gif flags=(attach_disconnected,mediate_deleted) {
   /run/{s6,s6-rc*,service}/** ix,
   /package/** ix,
   /command/** ix,
-  /etc/s6/** rix,
-  /etc/s6-overlay/** rix,
   /etc/services.d/** rwix,
   /etc/cont-init.d/** rwix,
   /etc/cont-finish.d/** rwix,
+  /run/{,**} rwk,
+  /dev/tty rw,
 
   # Bashio
   /usr/lib/bashio/** ix,
   /tmp/** rwk,
-  /dev/shm/** rwk,
 
   # Application data
   /data/** rw,
@@ -37,8 +36,4 @@ profile weather_forecast_gif flags=(attach_disconnected,mediate_deleted) {
   /letters/** r,
   /numbers/** r,
   /punctuation/** r,
-
-  # Suppress access denied
-  deny @{PROC}/{[0-9]*/,}sched rw,
-  deny /sys/** w,
 }
