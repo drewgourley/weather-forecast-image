@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.3
+
+- Fix: Add `?return_response` to `get_forecasts` service call (required by HA for response-returning services)
+
 ## 1.0.2
 
 - Fix: Station entity now only overrides icon and current temperature (humidity, wind, pressure come from forecast entity)

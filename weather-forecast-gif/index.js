@@ -66,7 +66,7 @@ async function fetchHAForecast(entityId, type = 'daily') {
   if (SUPERVISOR_TOKEN) {
     headers['Authorization'] = `Bearer ${SUPERVISOR_TOKEN}`;
   }
-  const url = `${HA_API_BASE}/services/weather/get_forecasts`;
+  const url = `${HA_API_BASE}/services/weather/get_forecasts?return_response`;
   console.log(`  [HA API] POST ${url} (entity: ${entityId}, type: ${type})`);
   const res = await axios.post(url, {
     entity_id: entityId,
