@@ -1,0 +1,20 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Weather Forecast GIF Configuration",
+        "description": "Configure the weather entities and server port.",
+        "data": {
+          "forecast_entity": "Forecast Entity",
+          "station_entity": "Station Entity (optional)",
+          "port": "Web Server Port"
+        },
+        "data_description": {
+          "forecast_entity": "A weather.* entity that provides forecast data (e.g. weather.pirateweather). Must have daily forecast attributes.",
+          "station_entity": "An optional weather.* entity for current conditions from a local weather station (e.g. weather.my_station). Leave empty to use the forecast entity for current conditions too.",
+          "port": "Port number for the built-in web server that serves the generated GIF."
+        }
+      }
+    }
+  }
+}

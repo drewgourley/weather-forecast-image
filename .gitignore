@@ -1,0 +1,11 @@
+node_modules/
+.DS_Store
+.env
+.env.local
+npm-debug.log*
+dist/
+build/
+weather-forecast.gif
+out/
+.idea/
+.vscode/settings.json

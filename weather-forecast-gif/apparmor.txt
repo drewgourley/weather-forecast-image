@@ -1,0 +1,44 @@
+#include <tunables/global>
+
+profile weather_forecast_gif flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  # Capabilities
+  file,
+  signal (send) set=(s6-svscan, s6-supervise, cont, term, kill),
+
+  # S6-Overlay
+  /init ix,
+  /bin/** ix,
+  /usr/bin/** ix,
+  /run/{s6,s6-rc*,service}/** ix,
+  /package/** ix,
+  /command/** ix,
+  /etc/s6/** rix,
+  /etc/s6-overlay/** rix,
+  /etc/services.d/** rwix,
+  /etc/cont-init.d/** rwix,
+  /etc/cont-finish.d/** rwix,
+
+  # Bashio
+  /usr/lib/bashio/** ix,
+  /tmp/** rwk,
+  /dev/shm/** rwk,
+
+  # Application data
+  /data/** rw,
+
+  # Node.js & app
+  /usr/bin/node ix,
+  /usr/local/bin/node ix,
+  /*.js r,
+  /node_modules/** r,
+  /icons/** r,
+  /letters/** r,
+  /numbers/** r,
+  /punctuation/** r,
+
+  # Suppress access denied
+  deny @{PROC}/{[0-9]*/,}sched rw,
+  deny /sys/** w,
+}

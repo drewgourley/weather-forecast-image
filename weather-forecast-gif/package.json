@@ -1,0 +1,24 @@
+{
+  "name": "weather-forecast-image",
+  "version": "1.0.0",
+  "description": "Generate animated weather forecast GIFs as a Home Assistant add-on",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "canvas": "^3.2.3",
+    "express": "^5.2.1",
+    "gif-encoder": "^0.7.2",
+    "jimp": "^0.22.11",
+    "node-cron": "^4.2.1"
+  },
+  "keywords": [
+    "weather",
+    "gif",
+    "forecast"
+  ],
+  "author": "",
+  "license": "MIT"
+}

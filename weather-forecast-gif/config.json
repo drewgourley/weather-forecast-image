@@ -1,0 +1,27 @@
+{
+  "name": "Weather Forecast GIF",
+  "description": "Generates an animated 64x64 weather forecast GIF from Home Assistant weather entities, designed for Divoom Pixoo 64 and similar pixel displays",
+  "version": "1.0.0",
+  "slug": "weather_forecast_gif",
+  "url": "https://github.com/drewgourley/weather-forecast-image",
+  "arch": ["armhf", "armv7", "aarch64", "amd64", "i386"],
+  "init": false,
+  "homeassistant_api": true,
+  "ports": {
+    "6942/tcp": 6942
+  },
+  "ports_description": {
+    "6942/tcp": "Web server serving the generated GIF"
+  },
+  "map": ["share:rw"],
+  "options": {
+    "forecast_entity": "weather.pirateweather",
+    "station_entity": "",
+    "port": 6942
+  },
+  "schema": {
+    "forecast_entity": "str",
+    "station_entity": "str?",
+    "port": "port"
+  }
+}

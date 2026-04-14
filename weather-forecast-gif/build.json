@@ -1,0 +1,6 @@
+{
+  "args": {
+    "codenotary": true,
+    "codenotary.signer": "drewgourley@gmail.com"
+  }
+}
