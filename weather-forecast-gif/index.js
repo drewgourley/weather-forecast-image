@@ -18,6 +18,11 @@ function loadOptions() {
     forecast_entity: process.env.FORECAST_ENTITY || 'weather.pirateweather',
     station_entity: process.env.STATION_ENTITY || '',
     port: parseInt(process.env.PORT || '6942'),
+    radar_enabled: (process.env.RADAR_ENABLED || 'true') === 'true',
+    radar_zoom: parseInt(process.env.RADAR_ZOOM || '6'),
+    radar_color_scheme: parseInt(process.env.RADAR_COLOR_SCHEME || '2'),
+    radar_smooth: (process.env.RADAR_SMOOTH || 'true') === 'true',
+    radar_snow: (process.env.RADAR_SNOW || 'true') === 'true',
   };
 }
 
@@ -450,6 +455,74 @@ async function renderTemperatureBig(image, tempStr, x, y, r = 255, g = 255, b = 
   }
 }
 
+// Render the date/time/day header onto an image (rows y=0..8, with divider at y=8)
+async function renderHeader(image) {
+  const C = FIXED_UI_COLORS;
+
+  // Black background behind header (y=0 to y=8 inclusive)
+  image.scan(0, 0, 64, 9, (x, y, idx) => {
+    image.bitmap.data[idx] = 0;
+    image.bitmap.data[idx + 1] = 0;
+    image.bitmap.data[idx + 2] = 0;
+    image.bitmap.data[idx + 3] = 255;
+  });
+
+  // Divider line at y=8
+  image.scan(1, 8, 62, 1, (x, y, idx) => {
+    image.bitmap.data[idx] = C.divider.r;
+    image.bitmap.data[idx + 1] = C.divider.g;
+    image.bitmap.data[idx + 2] = C.divider.b;
+    image.bitmap.data[idx + 3] = 255;
+  });
+
+  const now = Date.now() / 1000;
+  const dateStr = formatDate(now);
+  const { time: timeStr, isPM } = formatTimeShort(now);
+  const dayStr = getDayOfWeek(now);
+
+  const dateWidth = await measureTextWidth(dateStr, 7);
+  const timeWidth = await measureTextWidth(timeStr, 7);
+  const dayWidth = await measureTextWidth(dayStr, 7);
+
+  const ampmFile = isPM ? 'pm.png' : 'am.png';
+  const ampmPath = path.join(__dirname, 'punctuation', ampmFile);
+  let ampmGlyph = null;
+  let ampmWidth = 0;
+  try {
+    if (fs.existsSync(ampmPath)) {
+      ampmGlyph = await Jimp.read(ampmPath);
+      ampmWidth = ampmGlyph.bitmap.width + 1;
+    }
+  } catch (e) { /* skip if missing */ }
+
+  const dateX = 1;
+  const dateEndX = dateX + dateWidth + 1;
+  const dayX = 64 - dayWidth;
+  const totalTimeWidth = timeWidth + ampmWidth;
+  const timeCenterX = (dateEndX + dayX) / 2;
+  const timeX = Math.max(dateEndX + 1, timeCenterX - totalTimeWidth / 2);
+
+  await pasteTextColored(image, dateStr, dateX, 1, 7, C.alternate.r, C.alternate.g, C.alternate.b);
+  await pasteTextColored(image, timeStr, timeX, 1, 7, C.white.r, C.white.g, C.white.b);
+
+  if (ampmGlyph) {
+    const tintedAmpm = ampmGlyph.clone();
+    tintedAmpm.scan(0, 0, tintedAmpm.bitmap.width, tintedAmpm.bitmap.height, (px, py, idx) => {
+      const alpha = tintedAmpm.bitmap.data[idx + 3];
+      if (alpha > 0) {
+        tintedAmpm.bitmap.data[idx] = C.white.r;
+        tintedAmpm.bitmap.data[idx + 1] = C.white.g;
+        tintedAmpm.bitmap.data[idx + 2] = C.white.b;
+      }
+    });
+    const ampmX = timeX + timeWidth;
+    const ampmY = 1 + (7 - tintedAmpm.bitmap.height) - 2;
+    image.composite(tintedAmpm, Math.floor(ampmX), Math.floor(ampmY));
+  }
+
+  await pasteTextColored(image, dayStr, dayX, 1, 7, C.accent.r, C.accent.g, C.accent.b);
+}
+
 // Create weather display image using Jimp at 64x64 pixel-perfect rendering
 async function createWeatherImage(currentData, dailyData, isAnimationFrame2 = false) {
   const width = 64;
@@ -813,12 +886,232 @@ async function generateGIF(weatherData, outputFile = './weather-forecast.gif') {
   });
 }
 
+// --- Radar Map GIF Generation ---
+
+// Fetch lat/lon from Home Assistant zone.home entity
+async function fetchHomeLocation() {
+  const entity = await fetchHAEntity('zone.home');
+  return {
+    latitude: entity.attributes.latitude,
+    longitude: entity.attributes.longitude,
+  };
+}
+
+// Fetch RainViewer weather maps API to get available radar timestamps
+async function fetchRainViewerMaps() {
+  const res = await axios.get('https://api.rainviewer.com/public/weather-maps.json');
+  return res.data;
+}
+
+// Convert lat/lon to slippy map tile coordinates and fractional pixel offset
+function latLonToTile(lat, lon, zoom) {
+  const n = Math.pow(2, zoom);
+  const latRad = lat * Math.PI / 180;
+  const xTile = Math.floor((lon + 180) / 360 * n);
+  const yTile = Math.floor((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n);
+  // Fractional pixel position within the tile (0–255 for 256px tiles)
+  const xFrac = ((lon + 180) / 360 * n - xTile) * 256;
+  const yFrac = ((1 - Math.log(Math.tan(latRad) + 1 / Math.cos(latRad)) / Math.PI) / 2 * n - yTile) * 256;
+  return { xTile, yTile, xFrac, yFrac };
+}
+
+// Download a map tile from CartoDB dark basemap (label-free for 64px clarity)
+async function downloadMapTile(z, x, y) {
+  const url = `https://basemaps.cartocdn.com/dark_nolabels/${z}/${x}/${y}.png`;
+  const res = await axios.get(url, {
+    responseType: 'arraybuffer',
+    headers: { 'User-Agent': 'WeatherForecastGIF-HomeAssistant/1.0' },
+  });
+  return Jimp.read(Buffer.from(res.data));
+}
+
+// Download a radar tile from RainViewer using standard x/y/z tile coordinates
+async function downloadRadarTileXYZ(host, framePath, z, x, y, size, colorScheme, smooth, snow) {
+  const smoothVal = smooth ? 1 : 0;
+  const snowVal = snow ? 1 : 0;
+  const url = `${host}${framePath}/${size}/${z}/${x}/${y}/${colorScheme}/${smoothVal}_${snowVal}.png`;
+  const res = await axios.get(url, { responseType: 'arraybuffer' });
+  return Jimp.read(Buffer.from(res.data));
+}
+
+// Fetch a 2x2 grid of tiles, stitch, and crop 256x256 centered on lat/lon
+async function fetchCenteredTiles(lat, lon, zoom, tileFetcher) {
+  const { xTile, yTile, xFrac, yFrac } = latLonToTile(lat, lon, zoom);
+
+  // Pick the 2x2 grid that surrounds the center point
+  const xBase = xFrac >= 128 ? xTile : xTile - 1;
+  const yBase = yFrac >= 128 ? yTile : yTile - 1;
+
+  const tiles = await Promise.all([
+    tileFetcher(zoom, xBase, yBase),
+    tileFetcher(zoom, xBase + 1, yBase),
+    tileFetcher(zoom, xBase, yBase + 1),
+    tileFetcher(zoom, xBase + 1, yBase + 1),
+  ]);
+
+  // Stitch into 512x512
+  const stitched = new Jimp(512, 512, 0x00000000);
+  stitched.composite(tiles[0], 0, 0);
+  stitched.composite(tiles[1], 256, 0);
+  stitched.composite(tiles[2], 0, 256);
+  stitched.composite(tiles[3], 256, 256);
+
+  // Crop 256x256 centered on the exact lat/lon
+  const centerX = xFrac >= 128 ? xFrac : xFrac + 256;
+  const centerY = yFrac >= 128 ? yFrac : yFrac + 256;
+  stitched.crop(Math.round(centerX - 128), Math.round(centerY - 128), 256, 256);
+
+  return stitched;
+}
+
+// Cache for the map background (it rarely changes)
+let mapTileCache = null;
+let mapTileCacheKey = '';
+
+// Generate animated radar map GIF from RainViewer data
+async function generateRadarGIF(outputFile, opts, overrideLocation) {
+  const { radar_zoom: zoom, radar_color_scheme: colorScheme, radar_smooth: smooth, radar_snow: snow } = opts;
+  const size = 256;
+
+  let latitude, longitude;
+  if (overrideLocation) {
+    latitude = overrideLocation.latitude;
+    longitude = overrideLocation.longitude;
+  } else {
+    console.log('  Fetching home location from Home Assistant...');
+    ({ latitude, longitude } = await fetchHomeLocation());
+  }
+  console.log(`  Home location: ${latitude}, ${longitude}`);
+
+  // Fetch or reuse cached map background
+  const cacheKey = `${latitude},${longitude},${zoom}`;
+  let mapBackground;
+  if (mapTileCache && mapTileCacheKey === cacheKey) {
+    mapBackground = mapTileCache;
+    console.log('  Using cached map background');
+  } else {
+    console.log('  Downloading map background tiles...');
+    mapBackground = await fetchCenteredTiles(latitude, longitude, zoom, downloadMapTile);
+    mapTileCache = mapBackground;
+    mapTileCacheKey = cacheKey;
+  }
+
+  console.log('  Fetching RainViewer radar data...');
+  const mapsData = await fetchRainViewerMaps();
+  const host = mapsData.host;
+  const pastFrames = mapsData.radar.past || [];
+
+  // Take the last 5 frames (most recent ~50 minutes of radar data)
+  const frames = pastFrames.slice(-5);
+  if (frames.length === 0) {
+    throw new Error('No radar frames available from RainViewer');
+  }
+
+  console.log(`  Downloading ${frames.length} radar frames...`);
+  const radarImages = [];
+  for (let fi = 0; fi < frames.length; fi++) {
+    const frame = frames[fi];
+    const radarTile = await fetchCenteredTiles(latitude, longitude, zoom,
+      (z, x, y) => downloadRadarTileXYZ(host, frame.path, z, x, y, size, colorScheme, smooth, snow));
+
+    // Composite radar over map background clone
+    const composited = mapBackground.clone();
+    composited.composite(radarTile, 0, 0);
+
+    // Resize to 64x64
+    composited.resize(64, 64);
+
+    // Add home icon at the center
+    const homeIcon = await Jimp.read(path.resolve(__dirname, 'icons', 'home.png'));
+    const hx = Math.floor((64 - homeIcon.bitmap.width) / 2);
+    const hy = Math.floor((64 - homeIcon.bitmap.height) / 2);
+    composited.composite(homeIcon, hx, hy);
+
+    // Render date/time header with black background at top
+    await renderHeader(composited);
+
+    // Draw progress bar at bottom (2px tall, progressively wider)
+    const C = FIXED_UI_COLORS;
+    const barWidth = Math.round(64 * (fi + 1) / frames.length);
+    composited.scan(0, 62, barWidth, 2, (x, y, idx) => {
+      composited.bitmap.data[idx] = C.todayLow.r;
+      composited.bitmap.data[idx + 1] = C.todayLow.g;
+      composited.bitmap.data[idx + 2] = C.todayLow.b;
+      composited.bitmap.data[idx + 3] = 255;
+    });
+
+    // Render radar frame timestamp in lower-left (24hr format)
+    const frameDate = new Date(frame.time * 1000);
+    const frameHH = String(frameDate.getHours()).padStart(2, '0');
+    const frameMM = String(frameDate.getMinutes()).padStart(2, '0');
+    const frameTimeStr = `${frameHH}:${frameMM}`;
+    await pasteTextColored(composited, frameTimeStr, 1, 55, 6, C.forecastLow.r, C.forecastLow.g, C.forecastLow.b);
+
+    radarImages.push(composited);
+  }
+
+  // Extract RGBA pixel data from each frame
+  const allPixelData = radarImages.map(img => {
+    const buf = Buffer.alloc(64 * 64 * 4);
+    for (let y = 0; y < 64; y++) {
+      for (let x = 0; x < 64; x++) {
+        const rgba = Jimp.intToRGBA(img.getPixelColor(x, y));
+        const idx = (y * 64 + x) * 4;
+        buf[idx] = rgba.r;
+        buf[idx + 1] = rgba.g;
+        buf[idx + 2] = rgba.b;
+        buf[idx + 3] = rgba.a;
+      }
+    }
+    return buf;
+  });
+
+  // Create GIF encoder
+  const width = 64;
+  const height = 64;
+  const gif = new GIFEncoder(width, height);
+
+  const { Writable } = require('stream');
+  const chunks = [];
+  const writable = new Writable({
+    write(chunk, encoding, callback) {
+      chunks.push(chunk);
+      callback();
+    }
+  });
+
+  return new Promise((resolve, reject) => {
+    writable.on('finish', () => {
+      const buffer = Buffer.concat(chunks);
+      fs.writeFileSync(outputFile, buffer);
+      console.log(`✓ Radar GIF generated: ${outputFile}`);
+      resolve();
+    });
+
+    writable.on('error', (err) => reject(err));
+    gif.on('error', (err) => reject(err));
+
+    gif.pipe(writable);
+    gif.writeHeader();
+    gif.setQuality(1);
+    gif.setRepeat(0);
+
+    for (let i = 0; i < allPixelData.length; i++) {
+      gif.setDelay(i === allPixelData.length - 1 ? 1500 : 500);
+      gif.addFrame(allPixelData[i]);
+    }
+
+    gif.finish();
+  });
+}
+
 // Main execution
 async function main() {
   const opts = loadOptions();
   const forecastEntity = opts.forecast_entity;
   const stationEntity = opts.station_entity;
   const outputFile = '/data/weather-forecast.gif';
+  const radarOutputFile = '/data/radar-map.gif';
   const PORT = opts.port;
 
   let generationCount = 0;
@@ -843,11 +1136,22 @@ async function main() {
         }
       }
 
-      console.log(`Generating GIF #${generationCount}...`);
+      console.log(`Generating weather GIF #${generationCount}...`);
       await generateGIF(weatherData, outputFile);
-      console.log(`✓ Done!`);
+      console.log(`✓ Weather done!`);
     } catch (error) {
-      console.error('❌ Error:', error.message);
+      console.error('❌ Weather error:', error.message);
+    }
+
+    // Generate radar GIF if enabled
+    if (opts.radar_enabled) {
+      try {
+        console.log(`Generating radar GIF #${generationCount}...`);
+        await generateRadarGIF(radarOutputFile, opts);
+        console.log(`✓ Radar done!`);
+      } catch (error) {
+        console.error('❌ Radar error:', error.message);
+      }
     }
   }
 
@@ -855,14 +1159,16 @@ async function main() {
     console.log(`Home Assistant Weather Forecast GIF`);
     console.log(`   Forecast entity: ${forecastEntity}`);
     console.log(`   Station entity:  ${stationEntity || '(none)'}`);
+    console.log(`   Radar enabled:   ${opts.radar_enabled}`);
     console.log(`   Output: ${outputFile}`);
+    if (opts.radar_enabled) console.log(`   Radar output: ${radarOutputFile}`);
     console.log(`   Port: ${PORT}`);
     console.log(`Starting continuous GIF generation (every 1 min on the minute)\n`);
     
     // Set up Express web server
     const app = express();
     
-    // Serve the GIF file
+    // Serve the weather GIF file
     app.get('/', (req, res) => {
       const gifPath = path.resolve(outputFile);
       if (!fs.existsSync(gifPath)) {
@@ -880,11 +1186,22 @@ async function main() {
       res.type('image/gif');
       res.sendFile(gifPath);
     });
+
+    // Serve the radar GIF file
+    app.get('/radar.gif', (req, res) => {
+      const gifPath = path.resolve(radarOutputFile);
+      if (!fs.existsSync(gifPath)) {
+        return res.status(503).send('Radar GIF not generated yet');
+      }
+      res.type('image/gif');
+      res.sendFile(gifPath);
+    });
     
     // Start web server
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Web server running on port ${PORT}`);
-      console.log(`Access the GIF at http://<your-ha-ip>:${PORT}/`);
+      console.log(`Access the weather GIF at http://<your-ha-ip>:${PORT}/`);
+      if (opts.radar_enabled) console.log(`Access the radar GIF at http://<your-ha-ip>:${PORT}/radar.gif`);
     });
     
     // Run once on startup
@@ -902,5 +1219,5 @@ async function main() {
 if (require.main === module) {
   main();
 } else {
-  module.exports = { generateGIF };
+  module.exports = { generateGIF, generateRadarGIF };
 }

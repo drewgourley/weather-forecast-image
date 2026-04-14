@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.4.0
+
+- Feature: Animated radar map GIF using RainViewer data centered on Home Assistant home location
+- Radar composites over CartoDB dark basemap for map topography context
+- Home icon overlay marks home location on radar
+- Date/time header overlay with black background at top of radar frames
+- Progress bar at bottom of radar frames indicating animation position
+- Per-frame timestamp in 24hr format in lower-left corner
+- Last radar frame holds 3x longer for readability
+- Configurable radar zoom, color scheme, smoothing, and snow display
+- Served at `/radar.gif` alongside existing weather GIF
+
 ## 1.3.2
 
 - Override humidity with hyperlocal weather station value when available

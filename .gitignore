@@ -11,3 +11,4 @@ out/
 .vscode/settings.json
 test-local.js
 test-output.gif
+test-radar.gif
