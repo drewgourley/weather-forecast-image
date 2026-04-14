@@ -60,9 +60,36 @@ async function fetchHAEntity(entityId) {
   return res.data;
 }
 
+// Fetch daily forecast via HA weather.get_forecasts service
+async function fetchHAForecast(entityId, type = 'daily') {
+  const headers = { 'Content-Type': 'application/json' };
+  if (SUPERVISOR_TOKEN) {
+    headers['Authorization'] = `Bearer ${SUPERVISOR_TOKEN}`;
+  }
+  const url = `${HA_API_BASE}/services/weather/get_forecasts`;
+  console.log(`  [HA API] POST ${url} (entity: ${entityId}, type: ${type})`);
+  const res = await axios.post(url, {
+    entity_id: entityId,
+    type: type,
+  }, { headers });
+  console.log(`  [HA API] get_forecasts response status: ${res.status}`);
+  // Response is keyed by entity_id
+  const data = res.data;
+  const entityData = data[entityId] || data;
+  const forecastList = entityData.forecast || [];
+  console.log(`  [HA API] forecast entries returned: ${forecastList.length}`);
+  if (forecastList.length > 0) {
+    console.log(`    first: ${JSON.stringify(forecastList[0])}`);
+    if (forecastList.length > 1) {
+      console.log(`    second: ${JSON.stringify(forecastList[1])}`);
+    }
+  }
+  return forecastList;
+}
+
 // Fetch weather data from Home Assistant entities
 async function fetchWeatherFromHA(forecastEntity, stationEntity) {
-  // Get forecast entity (Pirate Weather) for forecast + fallback current conditions
+  // Get forecast entity (Pirate Weather) for current conditions
   console.log(`  Fetching forecast entity: ${forecastEntity}`);
   const forecast = await fetchHAEntity(forecastEntity);
   const fAttr = forecast.attributes;
@@ -74,13 +101,6 @@ async function fetchWeatherFromHA(forecastEntity, stationEntity) {
   console.log(`    humidity: ${fAttr.humidity}`);
   console.log(`    wind_speed: ${fAttr.wind_speed}`);
   console.log(`    pressure: ${fAttr.pressure}`);
-  console.log(`    forecast entries: ${(fAttr.forecast || []).length}`);
-  if (fAttr.forecast && fAttr.forecast.length > 0) {
-    console.log(`    first forecast entry: ${JSON.stringify(fAttr.forecast[0])}`);
-    if (fAttr.forecast.length > 1) {
-      console.log(`    second forecast entry: ${JSON.stringify(fAttr.forecast[1])}`);
-    }
-  }
 
   // Build current conditions from forecast entity as baseline
   const currently = {
@@ -93,64 +113,36 @@ async function fetchWeatherFromHA(forecastEntity, stationEntity) {
     time: Math.floor(Date.now() / 1000),
   };
 
-  // Override current conditions with station entity if configured
+  // Override ONLY icon and temperature from station entity
   if (stationEntity) {
     try {
       const station = await fetchHAEntity(stationEntity);
       const sAttr = station.attributes;
       currently.icon = mapHAConditionToIcon(station.state);
       if (sAttr.temperature !== undefined) currently.temperature = sAttr.temperature;
-      if (sAttr.apparent_temperature !== undefined) currently.apparentTemperature = sAttr.apparent_temperature;
-      if (sAttr.humidity !== undefined) currently.humidity = sAttr.humidity / 100;
-      if (sAttr.wind_speed !== undefined) currently.windSpeed = sAttr.wind_speed;
-      if (sAttr.pressure !== undefined) currently.pressure = sAttr.pressure;
-      console.log(`Station data: ${currently.temperature}°F, ${Math.round(currently.humidity * 100)}% humidity`);
+      console.log(`  Station override: icon=${currently.icon}, temp=${currently.temperature}°F`);
     } catch (e) {
       console.error(`  Could not fetch station entity: ${e.message}`);
     }
   }
 
-  // Build daily forecast from the forecast attribute
+  // Fetch daily forecast via get_forecasts service (HA 2024.3+)
   const dailyData = [];
-  const forecastList = fAttr.forecast || [];
-
-  // Group hourly forecasts into daily if needed, or use daily directly
-  if (forecastList.length > 0) {
-    // Check if this looks like daily data (entries ~24h apart)
-    const isDailyForecast = forecastList.length <= 10 ||
-      (forecastList.length >= 2 &&
-        new Date(forecastList[1].datetime) - new Date(forecastList[0].datetime) >= 12 * 3600 * 1000);
-
-    if (isDailyForecast) {
-      for (const entry of forecastList.slice(0, 5)) {
-        dailyData.push({
-          time: Math.floor(new Date(entry.datetime).getTime() / 1000),
-          icon: mapHAConditionToIcon(entry.condition),
-          temperatureHigh: entry.temperature ?? entry.templow ?? 0,
-          temperatureLow: entry.templow ?? entry.temperature ?? 0,
-        });
-      }
-    } else {
-      // Hourly data — group by day
-      const dayMap = new Map();
-      for (const entry of forecastList) {
-        const d = new Date(entry.datetime);
-        const dayKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-        if (!dayMap.has(dayKey)) {
-          dayMap.set(dayKey, { temps: [], conditions: [], time: d });
-        }
-        const day = dayMap.get(dayKey);
-        day.temps.push(entry.temperature);
-        day.conditions.push(entry.condition);
-      }
-      for (const [, day] of [...dayMap.entries()].slice(0, 5)) {
-        dailyData.push({
-          time: Math.floor(day.time.getTime() / 1000),
-          icon: mapHAConditionToIcon(day.conditions[Math.floor(day.conditions.length / 2)]),
-          temperatureHigh: Math.max(...day.temps),
-          temperatureLow: Math.min(...day.temps),
-        });
-      }
+  try {
+    const forecastList = await fetchHAForecast(forecastEntity, 'daily');
+    for (const entry of forecastList.slice(0, 5)) {
+      dailyData.push({
+        time: Math.floor(new Date(entry.datetime).getTime() / 1000),
+        icon: mapHAConditionToIcon(entry.condition),
+        temperatureHigh: entry.temperature ?? entry.templow ?? 0,
+        temperatureLow: entry.templow ?? entry.temperature ?? 0,
+      });
+    }
+  } catch (e) {
+    console.error(`  Could not fetch forecast: ${e.message}`);
+    if (e.response) {
+      console.error(`  Response status: ${e.response.status}`);
+      console.error(`  Response data: ${JSON.stringify(e.response.data)}`);
     }
   }
 
