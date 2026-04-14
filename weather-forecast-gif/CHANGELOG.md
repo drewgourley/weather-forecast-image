@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0
+
+- Switched both weather and radar GIFs from gif-encoder (NeuQuant per-frame) to omggif (global color table) for consistent colors across all frames
+- Added radar legend color bar replacing gray divider in radar header
+- Defined FIXED_RADAR_COLORS constants for 17 radar intensity levels
+- Radar palette now reserves both UI and radar legend colors before frequency-based fill
+- Removed unused gif-encoder and canvas dependencies
+
 ## 1.4.0
 
 - Feature: Animated radar map GIF using RainViewer data centered on Home Assistant home location

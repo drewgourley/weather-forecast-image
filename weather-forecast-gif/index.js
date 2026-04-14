@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 const axios = require('axios');
-const GIFEncoder = require('gif-encoder');
 const fs = require('fs');
 const path = require('path');
 const Jimp = require('jimp');
@@ -459,21 +458,45 @@ async function renderTemperatureBig(image, tempStr, x, y, r = 255, g = 255, b = 
 async function renderHeader(image) {
   const C = FIXED_UI_COLORS;
 
-  // Black background behind header (y=0 to y=8 inclusive)
-  image.scan(0, 0, 64, 9, (x, y, idx) => {
+  // Black background behind header (y=0 to y=9 inclusive, extra row for 2px legend)
+  image.scan(0, 0, 64, 10, (x, y, idx) => {
     image.bitmap.data[idx] = 0;
     image.bitmap.data[idx + 1] = 0;
     image.bitmap.data[idx + 2] = 0;
     image.bitmap.data[idx + 3] = 255;
   });
 
-  // Divider line at y=8
-  image.scan(1, 8, 62, 1, (x, y, idx) => {
-    image.bitmap.data[idx] = C.divider.r;
-    image.bitmap.data[idx + 1] = C.divider.g;
-    image.bitmap.data[idx + 2] = C.divider.b;
-    image.bitmap.data[idx + 3] = 255;
-  });
+  // Radar legend bar at y=8 (2px tall, drawn from FIXED_RADAR_COLORS)
+  const RC = FIXED_RADAR_COLORS;
+  const legendColors = [
+    RC.mistFog, RC.mistFog, RC.mistFog,
+    RC.drizzle, RC.drizzle, RC.drizzle, RC.drizzle,
+    RC.lightRain, RC.lightRain, RC.lightRain, RC.lightRain,
+    RC.rain, RC.rain, RC.rain, RC.rain,
+    RC.modRain, RC.modRain, RC.modRain, RC.modRain,
+    RC.heavyRain, RC.heavyRain, RC.heavyRain, RC.heavyRain,
+    RC.yellow, RC.yellow, RC.yellow,
+    RC.lightOrange, RC.lightOrange, RC.lightOrange, RC.lightOrange,
+    RC.orange, RC.orange, RC.orange, RC.orange,
+    RC.redOrange, RC.redOrange, RC.redOrange, RC.redOrange,
+    RC.red, RC.red, RC.red,
+    RC.darkRed, RC.darkRed, RC.darkRed, RC.darkRed,
+    RC.lightPink, RC.lightPink, RC.lightPink, RC.lightPink,
+    RC.pink, RC.pink, RC.pink, RC.pink,
+    RC.magenta, RC.magenta, RC.magenta,
+    RC.brightMagenta, RC.brightMagenta, RC.brightMagenta, RC.brightMagenta,
+    RC.darkMagenta, RC.darkMagenta, RC.darkMagenta, RC.darkMagenta,
+  ];
+  for (let row = 0; row < 2; row++) {
+    for (let x = 0; x < 64; x++) {
+      const c = legendColors[x];
+      const idx = ((8 + row) * 64 + x) * 4;
+      image.bitmap.data[idx] = c.r;
+      image.bitmap.data[idx + 1] = c.g;
+      image.bitmap.data[idx + 2] = c.b;
+      image.bitmap.data[idx + 3] = 255;
+    }
+  }
 
   const now = Date.now() / 1000;
   const dateStr = formatDate(now);
@@ -744,6 +767,26 @@ const FIXED_UI_COLORS = {
   todayLow:      { r: 100, g: 158, b: 238 },   // blue today low temp
 };
 
+const FIXED_RADAR_COLORS = {
+  mistFog:       { r: 146, g: 136, b: 113 },  // mist/fog
+  drizzle:       { r: 206, g: 192, b: 135 },  // drizzle
+  lightRain:     { r: 136, g: 221, b: 238 },  // light rain
+  rain:          { r: 0, g: 153, b: 204 },    // rain
+  modRain:       { r: 0, g: 119, b: 170 },    // moderate rain
+  heavyRain:     { r: 0, g: 85, b: 136 },     // heavy rain
+  yellow:        { r: 255, g: 238, b: 0 },    // intense
+  lightOrange:   { r: 255, g: 170, b: 0 },    // light orange
+  orange:        { r: 255, g: 119, b: 0 },    // orange
+  redOrange:     { r: 255, g: 68, b: 0 },     // red-orange
+  red:           { r: 238, g: 0, b: 0 },      // red
+  darkRed:       { r: 153, g: 0, b: 0 },      // dark red
+  lightPink:     { r: 255, g: 170, b: 255 },  // light pink
+  pink:          { r: 255, g: 119, b: 255 },  // pink
+  magenta:       { r: 255, g: 68, b: 255 },   // magenta
+  brightMagenta: { r: 255, g: 0, b: 255 },    // bright magenta
+  darkMagenta:   { r: 170, g: 0, b: 170 },    // dark magenta
+};
+
 // Build a unified palette from both animation frames
 function buildUnifiedPalette(frame1, frame2) {
   const colorCounts = new Map();
@@ -764,8 +807,61 @@ function buildUnifiedPalette(frame1, frame2) {
 
   for (const c of Object.values(FIXED_UI_COLORS)) {
     const key = (c.r << 16) | (c.g << 8) | c.b;
-    palette.push(c);
-    usedKeys.add(key);
+    if (!usedKeys.has(key)) {
+      palette.push(c);
+      usedKeys.add(key);
+    }
+  }
+
+  // Add remaining colors sorted by frequency
+  const remaining = [...colorCounts.entries()]
+    .filter(([key]) => !usedKeys.has(key))
+    .sort((a, b) => b[1] - a[1]);
+
+  for (const [key] of remaining) {
+    if (palette.length >= 256) break;
+    palette.push({
+      r: (key >> 16) & 0xFF,
+      g: (key >> 8) & 0xFF,
+      b: key & 0xFF
+    });
+  }
+
+  return palette;
+}
+
+// Build a unified palette for radar frames, reserving UI + radar legend colors
+function buildRadarPalette(frames) {
+  const colorCounts = new Map();
+
+  for (const frame of frames) {
+    for (let i = 0; i < frame.length; i += 4) {
+      const a = frame[i + 3];
+      if (a < 128) continue;
+      const key = (frame[i] << 16) | (frame[i + 1] << 8) | frame[i + 2];
+      colorCounts.set(key, (colorCounts.get(key) || 0) + 1);
+    }
+  }
+
+  const palette = [];
+  const usedKeys = new Set();
+
+  // Reserve UI colors (used in header, progress bar, timestamps)
+  for (const c of Object.values(FIXED_UI_COLORS)) {
+    const key = (c.r << 16) | (c.g << 8) | c.b;
+    if (!usedKeys.has(key)) {
+      palette.push(c);
+      usedKeys.add(key);
+    }
+  }
+
+  // Reserve radar legend colors
+  for (const c of Object.values(FIXED_RADAR_COLORS)) {
+    const key = (c.r << 16) | (c.g << 8) | c.b;
+    if (!usedKeys.has(key)) {
+      palette.push(c);
+      usedKeys.add(key);
+    }
   }
 
   // Add remaining colors sorted by frequency
@@ -844,46 +940,44 @@ async function generateGIF(weatherData, outputFile = './weather-forecast.gif') {
   const frame1 = remapFrameToPalette(rawFrame1, unifiedPalette);
   const frame2 = remapFrameToPalette(rawFrame2, unifiedPalette);
 
-  // Create GIF encoder
-  const gif = new GIFEncoder(width, height);
+  // Build palette as array of 0xRRGGBB ints for omggif (must be 256 entries)
+  const gifPalette = new Array(256).fill(0);
+  for (let i = 0; i < unifiedPalette.length; i++) {
+    gifPalette[i] = (unifiedPalette[i].r << 16) | (unifiedPalette[i].g << 8) | unifiedPalette[i].b;
+  }
 
-  // Use stream to capture GIF output before writing frames
-  const { Writable } = require('stream');
-  const chunks = [];
-  const writable = new Writable({
-    write(chunk, encoding, callback) {
-      chunks.push(chunk);
-      callback();
+  // Build RGB-key to palette-index lookup
+  const paletteIndexMap = new Map();
+  for (let i = 0; i < unifiedPalette.length; i++) {
+    const key = (unifiedPalette[i].r << 16) | (unifiedPalette[i].g << 8) | unifiedPalette[i].b;
+    if (!paletteIndexMap.has(key)) paletteIndexMap.set(key, i);
+  }
+
+  // Convert each RGBA frame to palette-indexed pixels
+  const nPix = 64 * 64;
+  const frames = [frame1, frame2];
+  const indexedFrames = frames.map(frame => {
+    const indexed = new Uint8Array(nPix);
+    for (let i = 0; i < nPix; i++) {
+      const off = i * 4;
+      const key = (frame[off] << 16) | (frame[off + 1] << 8) | frame[off + 2];
+      indexed[i] = paletteIndexMap.get(key) || 0;
     }
+    return indexed;
   });
 
-  return new Promise((resolve, reject) => {
-    // Set up event listeners BEFORE starting encoding
-    writable.on('finish', () => {
-      const buffer = Buffer.concat(chunks);
-      fs.writeFileSync(outputFile, buffer);
-      console.log(`✓ Weather GIF generated: ${outputFile}`);
-      resolve();
-    });
+  // Encode GIF with omggif using a single global color table
+  const omggif = require('omggif');
+  const bufSize = nPix * indexedFrames.length * 2 + 1024;
+  const buf = Buffer.alloc(bufSize);
+  const gif = new omggif.GifWriter(buf, width, height, { palette: gifPalette, loop: 0 });
 
-    writable.on('error', (err) => {
-      reject(err);
-    });
+  for (const indexed of indexedFrames) {
+    gif.addFrame(0, 0, width, height, indexed, { delay: 94 }); // 940ms in centiseconds
+  }
 
-    gif.on('error', (err) => {
-      reject(err);
-    });
-
-    // Now pipe and encode
-    gif.pipe(writable);
-    gif.writeHeader();
-    gif.setQuality(1); // Best NeuQuant quality for palette accuracy
-    gif.setDelay(944); // 944ms per frame
-    gif.setRepeat(0); // Loop infinitely
-    gif.addFrame(frame1);
-    gif.addFrame(frame2);
-    gif.finish();
-  });
+  fs.writeFileSync(outputFile, buf.slice(0, gif.end()));
+  console.log(`✓ Weather GIF generated: ${outputFile}`);
 }
 
 // --- Radar Map GIF Generation ---
@@ -968,6 +1062,16 @@ async function fetchCenteredTiles(lat, lon, zoom, tileFetcher) {
 let mapTileCache = null;
 let mapTileCacheKey = '';
 
+// Cache for radar base frames (map + radar + home icon, before header/overlays)
+let radarBaseFramesCache = null;
+let radarFrameTimestamps = null;
+
+// Check if we should refresh radar data (1 minute after every 10-minute mark)
+function shouldRefreshRadar() {
+  const minute = new Date().getMinutes();
+  return minute % 10 === 1;
+}
+
 // Generate animated radar map GIF from RainViewer data
 async function generateRadarGIF(outputFile, opts, overrideLocation) {
   const { radar_zoom: zoom, radar_color_scheme: colorScheme, radar_smooth: smooth, radar_snow: snow } = opts;
@@ -996,43 +1100,64 @@ async function generateRadarGIF(outputFile, opts, overrideLocation) {
     mapTileCacheKey = cacheKey;
   }
 
-  console.log('  Fetching RainViewer radar data...');
-  const mapsData = await fetchRainViewerMaps();
-  const host = mapsData.host;
-  const pastFrames = mapsData.radar.past || [];
+  // Only re-fetch radar data on the 10s+1 schedule, or if no cache exists
+  const needsRadarRefresh = !radarBaseFramesCache || shouldRefreshRadar();
 
-  // Take the last 5 frames (most recent ~50 minutes of radar data)
-  const frames = pastFrames.slice(-5);
-  if (frames.length === 0) {
-    throw new Error('No radar frames available from RainViewer');
+  if (needsRadarRefresh) {
+    console.log('  Fetching RainViewer radar data...');
+    const mapsData = await fetchRainViewerMaps();
+    const host = mapsData.host;
+    const pastFrames = mapsData.radar.past || [];
+
+    // Take the last 5 frames (most recent ~50 minutes of radar data)
+    const frames = pastFrames.slice(-5);
+    if (frames.length === 0) {
+      throw new Error('No radar frames available from RainViewer');
+    }
+
+    console.log(`  Downloading ${frames.length} radar frames...`);
+    radarBaseFramesCache = [];
+    radarFrameTimestamps = [];
+    for (const frame of frames) {
+      const radarTile = await fetchCenteredTiles(latitude, longitude, zoom,
+        (z, x, y) => downloadRadarTileXYZ(host, frame.path, z, x, y, size, colorScheme, smooth, snow));
+
+      // Composite radar over map background clone
+      const composited = mapBackground.clone();
+      composited.composite(radarTile, 0, 0);
+
+      // Resize to 64x64
+      composited.resize(64, 64);
+
+      // Add home icon at the center
+      const homeIcon = await Jimp.read(path.resolve(__dirname, 'icons', 'home.png'));
+      const hx = Math.floor((64 - homeIcon.bitmap.width) / 2);
+      const hy = Math.floor((64 - homeIcon.bitmap.height) / 2);
+      composited.composite(homeIcon, hx, hy);
+
+      // Shift radar + home icon down 4px to clear header area
+      const shifted = new Jimp(64, 64, 0x000000FF);
+      shifted.composite(composited, 0, 4);
+
+      radarBaseFramesCache.push(shifted);
+      radarFrameTimestamps.push(frame.time);
+    }
+  } else {
+    console.log('  Using cached radar frames (next refresh at xx:x1)');
   }
 
-  console.log(`  Downloading ${frames.length} radar frames...`);
+  // Apply overlays (header, progress bar, timestamp) on top of cached base frames
   const radarImages = [];
-  for (let fi = 0; fi < frames.length; fi++) {
-    const frame = frames[fi];
-    const radarTile = await fetchCenteredTiles(latitude, longitude, zoom,
-      (z, x, y) => downloadRadarTileXYZ(host, frame.path, z, x, y, size, colorScheme, smooth, snow));
-
-    // Composite radar over map background clone
-    const composited = mapBackground.clone();
-    composited.composite(radarTile, 0, 0);
-
-    // Resize to 64x64
-    composited.resize(64, 64);
-
-    // Add home icon at the center
-    const homeIcon = await Jimp.read(path.resolve(__dirname, 'icons', 'home.png'));
-    const hx = Math.floor((64 - homeIcon.bitmap.width) / 2);
-    const hy = Math.floor((64 - homeIcon.bitmap.height) / 2);
-    composited.composite(homeIcon, hx, hy);
+  const frameCount = radarBaseFramesCache.length;
+  for (let fi = 0; fi < frameCount; fi++) {
+    const composited = radarBaseFramesCache[fi].clone();
 
     // Render date/time header with black background at top
     await renderHeader(composited);
 
     // Draw progress bar at bottom (2px tall, progressively wider)
     const C = FIXED_UI_COLORS;
-    const barWidth = Math.round(64 * (fi + 1) / frames.length);
+    const barWidth = Math.round(64 * (fi + 1) / frameCount);
     composited.scan(0, 62, barWidth, 2, (x, y, idx) => {
       composited.bitmap.data[idx] = C.todayLow.r;
       composited.bitmap.data[idx + 1] = C.todayLow.g;
@@ -1041,7 +1166,7 @@ async function generateRadarGIF(outputFile, opts, overrideLocation) {
     });
 
     // Render radar frame timestamp in lower-left (24hr format)
-    const frameDate = new Date(frame.time * 1000);
+    const frameDate = new Date(radarFrameTimestamps[fi] * 1000);
     const frameHH = String(frameDate.getHours()).padStart(2, '0');
     const frameMM = String(frameDate.getMinutes()).padStart(2, '0');
     const frameTimeStr = `${frameHH}:${frameMM}`;
@@ -1051,7 +1176,7 @@ async function generateRadarGIF(outputFile, opts, overrideLocation) {
   }
 
   // Extract RGBA pixel data from each frame
-  const allPixelData = radarImages.map(img => {
+  const allRawPixelData = radarImages.map(img => {
     const buf = Buffer.alloc(64 * 64 * 4);
     for (let y = 0; y < 64; y++) {
       for (let x = 0; x < 64; x++) {
@@ -1066,43 +1191,49 @@ async function generateRadarGIF(outputFile, opts, overrideLocation) {
     return buf;
   });
 
-  // Create GIF encoder
-  const width = 64;
-  const height = 64;
-  const gif = new GIFEncoder(width, height);
+  // Build unified radar palette reserving UI + radar legend colors
+  const radarPalette = buildRadarPalette(allRawPixelData);
+  const allPixelData = allRawPixelData.map(frame => remapFrameToPalette(frame, radarPalette));
 
-  const { Writable } = require('stream');
-  const chunks = [];
-  const writable = new Writable({
-    write(chunk, encoding, callback) {
-      chunks.push(chunk);
-      callback();
+  // Build palette as array of 0xRRGGBB ints for omggif (must be 256 entries)
+  const gifPalette = new Array(256).fill(0);
+  for (let i = 0; i < radarPalette.length; i++) {
+    gifPalette[i] = (radarPalette[i].r << 16) | (radarPalette[i].g << 8) | radarPalette[i].b;
+  }
+
+  // Build RGB-key to palette-index lookup
+  const paletteIndexMap = new Map();
+  for (let i = 0; i < radarPalette.length; i++) {
+    const key = (radarPalette[i].r << 16) | (radarPalette[i].g << 8) | radarPalette[i].b;
+    if (!paletteIndexMap.has(key)) paletteIndexMap.set(key, i);
+  }
+
+  // Convert each RGBA frame to palette-indexed pixels
+  const nPix = 64 * 64;
+  const allIndexedFrames = allPixelData.map(frame => {
+    const indexed = new Uint8Array(nPix);
+    for (let i = 0; i < nPix; i++) {
+      const off = i * 4;
+      const key = (frame[off] << 16) | (frame[off + 1] << 8) | frame[off + 2];
+      indexed[i] = paletteIndexMap.get(key) || 0;
     }
+    return indexed;
   });
 
-  return new Promise((resolve, reject) => {
-    writable.on('finish', () => {
-      const buffer = Buffer.concat(chunks);
-      fs.writeFileSync(outputFile, buffer);
-      console.log(`✓ Radar GIF generated: ${outputFile}`);
-      resolve();
+  // Encode GIF with omggif using a single global color table
+  const omggif = require('omggif');
+  const bufSize = nPix * allIndexedFrames.length * 2 + 1024;
+  const buf = Buffer.alloc(bufSize);
+  const gif = new omggif.GifWriter(buf, 64, 64, { palette: gifPalette, loop: 0 });
+
+  for (let i = 0; i < allIndexedFrames.length; i++) {
+    gif.addFrame(0, 0, 64, 64, allIndexedFrames[i], {
+      delay: i === allIndexedFrames.length - 1 ? 150 : 50, // omggif delay is in centiseconds
     });
+  }
 
-    writable.on('error', (err) => reject(err));
-    gif.on('error', (err) => reject(err));
-
-    gif.pipe(writable);
-    gif.writeHeader();
-    gif.setQuality(1);
-    gif.setRepeat(0);
-
-    for (let i = 0; i < allPixelData.length; i++) {
-      gif.setDelay(i === allPixelData.length - 1 ? 1500 : 500);
-      gif.addFrame(allPixelData[i]);
-    }
-
-    gif.finish();
-  });
+  fs.writeFileSync(outputFile, buf.slice(0, gif.end()));
+  console.log(`✓ Radar GIF generated: ${outputFile}`);
 }
 
 // Main execution
