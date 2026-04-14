@@ -539,7 +539,7 @@ async function createWeatherImage(currentData, dailyData, isAnimationFrame2 = fa
     pasteGrayBox(image, 2, 11, 21);
   }
   const tempBigWidth = await measureBigNumberWidth(tempStr);
-  const tempBigX = 64 - tempBigWidth - 1; // right-aligned with 1px margin
+  const tempBigX = 64 - tempBigWidth; // right-aligned flush
   // Render shadow behind
   await renderTemperatureBig(image, tempStr, tempBigX + 1, 12, C.divider.r, C.divider.g, C.divider.b);
   // Render white on top
@@ -621,7 +621,7 @@ async function createWeatherImage(currentData, dailyData, isAnimationFrame2 = fa
   await pasteTextColored(image, todayLowStr, todayX, 27, 6, C.todayLow.r, C.todayLow.g, C.todayLow.b);
 
   // Lower section (y=31-64): 4-column forecast layout (days 1-4)
-  const columnCenters = [8, 24, 40, 56]; // x centers for each column
+  const columnCenters = [9, 25, 41, 57]; // x centers for each column
   
   for (let i = 1; i < 5 && i < dailyData.length; i++) {
     const day = dailyData[i];

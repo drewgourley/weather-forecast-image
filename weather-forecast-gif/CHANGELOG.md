@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.1
+
+- Shifted forecast columns and current temperature display 1px right for better alignment
+
 ## 1.3.0
 
 - Feature: AM/PM indicator appended to time display in header
