@@ -88,7 +88,7 @@ async function fetchWeatherFromHA(forecastEntity, stationEntity) {
     time: Math.floor(Date.now() / 1000),
   };
 
-  // Override ONLY icon and temperature from station entity
+  // Override icon, temperature, and humidity from station entity
   if (stationEntity) {
     try {
       const station = await fetchHAEntity(stationEntity);
@@ -96,6 +96,7 @@ async function fetchWeatherFromHA(forecastEntity, stationEntity) {
       currently.forecastIcon = currently.icon; // preserve pirateweather icon
       currently.icon = mapHAConditionToIcon(station.state);
       if (sAttr.temperature !== undefined) currently.temperature = sAttr.temperature;
+      if (sAttr.humidity !== undefined) currently.humidity = sAttr.humidity / 100;
     } catch (e) {
       console.error(`Could not fetch station entity: ${e.message}`);
     }

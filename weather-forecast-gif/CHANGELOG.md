@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.2
+
+- Override humidity with hyperlocal weather station value when available
+
 ## 1.3.1
 
 - Shifted forecast columns and current temperature display 1px right for better alignment
