@@ -218,9 +218,10 @@ async function fetchWeatherData(forecastEntity, stationEntity) {
 function formatTimeShort(timestamp) {
   const date = new Date(timestamp * 1000);
   let hour = date.getHours();
+  const isPM = hour >= 12;
   const minute = String(date.getMinutes()).padStart(2, '0');
   hour = hour % 12 || 12; // Convert to 12-hour format
-  return `${hour}:${minute}`;
+  return { time: `${hour}:${minute}`, isPM };
 }
 
 // Format date for display (MM•DD format)
@@ -475,7 +476,7 @@ async function createWeatherImage(currentData, dailyData, isAnimationFrame2 = fa
   });
 
   const dateStr = formatDate(currentData.time);
-  const timeStr = formatTimeShort(Date.now() / 1000); // Use current system time
+  const { time: timeStr, isPM } = formatTimeShort(Date.now() / 1000); // Use current system time
   const dayStr = getDayOfWeek(currentData.time);
   
   const tempStr = Math.round(currentData.temperature) + '°';
@@ -485,14 +486,44 @@ async function createWeatherImage(currentData, dailyData, isAnimationFrame2 = fa
   const timeWidth = await measureTextWidth(timeStr, 7);
   const dayWidth = await measureTextWidth(dayStr, 7);
   
+  // Load AM/PM glyph
+  const ampmFile = isPM ? 'pm.png' : 'am.png';
+  const ampmPath = path.join(__dirname, 'punctuation', ampmFile);
+  let ampmGlyph = null;
+  let ampmWidth = 0;
+  try {
+    if (fs.existsSync(ampmPath)) {
+      ampmGlyph = await Jimp.read(ampmPath);
+      ampmWidth = ampmGlyph.bitmap.width + 1; // 1px gap before glyph
+    }
+  } catch (e) { /* skip if missing */ }
+  
   const dateX = 1;
   const dateEndX = dateX + dateWidth + 1; // 1px spacing after date
   const dayX = 64 - dayWidth; // right-aligned with 1px margin, moved 1px left
+  const totalTimeWidth = timeWidth + ampmWidth;
   const timeCenterX = (dateEndX + dayX) / 2; // center between date and day
-  const timeX = Math.max(dateEndX + 1, timeCenterX - timeWidth / 2); // don't overlap with date
+  const timeX = Math.max(dateEndX + 1, timeCenterX - totalTimeWidth / 2); // don't overlap with date
   
   await pasteTextColored(image, dateStr, dateX, 1, 7, C.alternate.r, C.alternate.g, C.alternate.b);
   await pasteTextColored(image, timeStr, timeX, 1, 7, C.white.r, C.white.g, C.white.b);
+  
+  // Append AM/PM glyph after time text
+  if (ampmGlyph) {
+    const tintedAmpm = ampmGlyph.clone();
+    tintedAmpm.scan(0, 0, tintedAmpm.bitmap.width, tintedAmpm.bitmap.height, (px, py, idx) => {
+      const alpha = tintedAmpm.bitmap.data[idx + 3];
+      if (alpha > 0) {
+        tintedAmpm.bitmap.data[idx] = C.white.r;
+        tintedAmpm.bitmap.data[idx + 1] = C.white.g;
+        tintedAmpm.bitmap.data[idx + 2] = C.white.b;
+      }
+    });
+    const ampmX = timeX + timeWidth;
+    const ampmY = 1 + (7 - tintedAmpm.bitmap.height) - 2; // bottom-align with time text, shifted up 2px
+    image.composite(tintedAmpm, Math.floor(ampmX), Math.floor(ampmY));
+  }
+  
   await pasteTextColored(image, dayStr, dayX, 1, 7, C.accent.r, C.accent.g, C.accent.b);
   
   // Main section: Animated weather icon and temperature

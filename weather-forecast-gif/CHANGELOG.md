@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.3.0
+
+- Feature: AM/PM indicator appended to time display in header
+
 ## 1.2.0
 
 - Feature: Added relative humidity display (icon, percentage, RH label) between current condition icon and temperature
