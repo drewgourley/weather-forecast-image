@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.0
+
+- Feature: Added relative humidity display (icon, percentage, RH label) between current condition icon and temperature
+- Feature: Main weather icon animates between station and forecast conditions
+- Forecast column icons use alt-frame animation
+
 ## 1.1.0
 
 - Fix: Station entity now only overrides icon and current temperature

@@ -217,7 +217,7 @@ async function fetchWeatherData(forecastEntity, stationEntity) {
 // Format time short for display (HH:MM only)
 function formatTimeShort(timestamp) {
   const date = new Date(timestamp * 1000);
-  let hour = String(date.getHours()).padStart(2, '0');
+  let hour = date.getHours();
   const minute = String(date.getMinutes()).padStart(2, '0');
   hour = hour % 12 || 12; // Convert to 12-hour format
   return `${hour}:${minute}`;
@@ -513,6 +513,43 @@ async function createWeatherImage(currentData, dailyData, isAnimationFrame2 = fa
   await renderTemperatureBig(image, tempStr, tempBigX + 1, 12, C.divider.r, C.divider.g, C.divider.b);
   // Render white on top
   await renderTemperatureBig(image, tempStr, tempBigX, 11, C.white.r, C.white.g, C.white.b);
+
+  // Humidity column between weather icon and big temp
+  const humidityIconPath = path.join(__dirname, 'icons', 'humidity.png');
+  const humidityColX = 26; // right of weather icon (ends ~x=23)
+  let humidityY = 11;
+  try {
+    if (fs.existsSync(humidityIconPath)) {
+      const humidityIcon = await Jimp.read(humidityIconPath);
+      const scaledHumIcon = humidityIcon.clone().resize(9, 9);
+      image.composite(scaledHumIcon, humidityColX, humidityY);
+      humidityY += 10; // 9px icon + 1px gap
+    }
+  } catch (e) { /* skip icon if missing */ }
+  const humidityStr = Math.round(currentData.humidity * 100).toString();
+  await pasteTextColored(image, humidityStr, humidityColX, humidityY, 6, C.forecastHigh.r, C.forecastHigh.g, C.forecastHigh.b);
+  const humidityNumWidth = await measureTextWidth(humidityStr, 6);
+  const percentPath = path.join(__dirname, 'punctuation', 'percent.png');
+  try {
+    if (fs.existsSync(percentPath)) {
+      const percentGlyph = await Jimp.read(percentPath);
+      const tintedPercent = percentGlyph.clone();
+      tintedPercent.scan(0, 0, tintedPercent.bitmap.width, tintedPercent.bitmap.height, (px, py, idx) => {
+        const alpha = tintedPercent.bitmap.data[idx + 3];
+        if (alpha > 0) {
+          tintedPercent.bitmap.data[idx] = C.forecastHigh.r;
+          tintedPercent.bitmap.data[idx + 1] = C.forecastHigh.g;
+          tintedPercent.bitmap.data[idx + 2] = C.forecastHigh.b;
+        }
+      });
+      image.composite(tintedPercent, humidityColX + humidityNumWidth, humidityY);
+    }
+  } catch (e) { /* skip percent if missing */ }
+  // "RH" label centered below humidity number
+  const humidityTotalWidth = humidityNumWidth + (fs.existsSync(percentPath) ? 4 : 0); // approx percent glyph width
+  const rhWidth = await measureTextWidth('RH', 6);
+  const rhX = humidityColX + Math.floor((humidityTotalWidth - rhWidth) / 2) - 1;
+  await pasteTextColored(image, 'RH', rhX, humidityY + 6, 6, C.forecastLow.r, C.forecastLow.g, C.forecastLow.b);
   
   // Today's high and low temperatures
   const todayHighStr = Math.round(dailyData[0].temperatureHigh) + '°';
@@ -531,7 +568,7 @@ async function createWeatherImage(currentData, dailyData, isAnimationFrame2 = fa
   const todayStartX = 63 - totalTodayWidth; // right-aligned with 1px margin
   
   let todayX = todayStartX;
-  await pasteTextColored(image, todayHighStr, todayX, 27, 6, C.todayHigh.r, C.todayHigh.g, C.todayHigh.b);
+  await pasteTextColored(image, todayHighStr, todayX + 2, 27, 6, C.todayHigh.r, C.todayHigh.g, C.todayHigh.b);
   todayX += todayHighWidth + 1;
   
   // Paste pipe glyph tinted to divider color
@@ -829,4 +866,9 @@ async function main() {
   }
 }
 
-main();
+// Allow requiring as a module for testing, or run directly
+if (require.main === module) {
+  main();
+} else {
+  module.exports = { generateGIF };
+}

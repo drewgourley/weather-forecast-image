@@ -9,3 +9,5 @@ weather-forecast.gif
 out/
 .idea/
 .vscode/settings.json
+test-local.js
+test-output.gif
