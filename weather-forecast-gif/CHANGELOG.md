@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.3
+
+- Fix config descriptions
+
 ## 1.5.2
 
 - Replaced axios with native fetch API to reduce dependency weight
