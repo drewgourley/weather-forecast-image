@@ -1,30 +1,36 @@
 {
-  "config": {
-    "step": {
-      "user": {
-        "title": "Weather Forecast GIF Configuration",
-        "description": "Configure the weather entities and server port.",
-        "data": {
-          "forecast_entity": "Forecast Entity",
-          "station_entity": "Station Entity (optional)",
-          "port": "Web Server Port",
-          "radar_enabled": "Enable Radar Map",
-          "radar_zoom": "Radar Zoom Level",
-          "radar_color_scheme": "Radar Color Scheme",
-          "radar_smooth": "Smooth Radar",
-          "radar_snow": "Show Snow on Radar"
-        },
-        "data_description": {
-          "forecast_entity": "A weather.* entity that provides forecast data (e.g. weather.pirateweather). Must have daily forecast attributes.",
-          "station_entity": "An optional weather.* entity for current conditions from a local weather station (e.g. weather.my_station). Leave empty to use the forecast entity for current conditions too.",
-          "port": "Port number for the built-in web server that serves the generated GIFs.",
-          "radar_enabled": "Enable or disable the animated radar map GIF served at /radar.gif.",
-          "radar_zoom": "Map zoom level for the radar view (1 = wide, 7 = close). Default: 6.",
-          "radar_color_scheme": "RainViewer color scheme index (0–8). Default: 2.",
-          "radar_smooth": "Apply smoothing to radar tiles for a cleaner look.",
-          "radar_snow": "Display snow coverage on the radar overlay."
-        }
-      }
+  "configuration": {
+    "forecast_entity": {
+      "name": "Forecast Entity",
+      "description": "A weather.* entity that provides forecast data (e.g. weather.pirateweather). Must have daily forecast attributes."
+    },
+    "station_entity": {
+      "name": "Station Entity",
+      "description": "An optional weather.* entity for current conditions from a local weather station (e.g. weather.my_station). Leave empty to use the forecast entity for current conditions too."
+    },
+    "port": {
+      "name": "Web Server Port",
+      "description": "Port number for the built-in web server that serves the generated GIFs."
+    },
+    "radar_enabled": {
+      "name": "Enable Radar Map",
+      "description": "Enable or disable the animated radar map GIF served at /radar.gif."
+    },
+    "radar_zoom": {
+      "name": "Radar Zoom Level",
+      "description": "Map zoom level for the radar view (1 = wide, 7 = close). Default: 6."
+    },
+    "radar_color_scheme": {
+      "name": "Radar Color Scheme",
+      "description": "RainViewer color scheme index (0–8). Default: 2."
+    },
+    "radar_smooth": {
+      "name": "Smooth Radar",
+      "description": "Apply smoothing to radar tiles for a cleaner look."
+    },
+    "radar_snow": {
+      "name": "Show Snow on Radar",
+      "description": "Display snow coverage on the radar overlay."
     }
   }
 }

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.4
+
+- Fix config descriptions... again
+
 ## 1.5.3
 
 - Fix config descriptions
