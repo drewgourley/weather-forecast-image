@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.8
+
+- More icon updates
+
 ## 1.5.7
 
 - Start icon update
