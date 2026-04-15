@@ -8,10 +8,6 @@
       "name": "Station Entity",
       "description": "An optional weather.* entity for current conditions from a local weather station (e.g. weather.my_station). Leave empty to use the forecast entity for current conditions too."
     },
-    "port": {
-      "name": "Web Server Port",
-      "description": "Port number for the built-in web server that serves the generated GIFs."
-    },
     "radar_enabled": {
       "name": "Enable Radar Map",
       "description": "Enable or disable the animated radar map GIF served at /radar.gif."

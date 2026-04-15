@@ -15,7 +15,6 @@ function loadOptions() {
   return {
     forecast_entity: process.env.FORECAST_ENTITY || 'weather.pirateweather',
     station_entity: process.env.STATION_ENTITY || '',
-    port: parseInt(process.env.PORT || '6942'),
     radar_enabled: (process.env.RADAR_ENABLED || 'true') === 'true',
     radar_zoom: parseInt(process.env.RADAR_ZOOM || '6'),
     radar_color_scheme: parseInt(process.env.RADAR_COLOR_SCHEME || '2'),
@@ -1254,7 +1253,7 @@ async function main() {
   const stationEntity = opts.station_entity;
   const outputFile = '/data/weather-forecast.gif';
   const radarOutputFile = '/data/radar-map.gif';
-  const PORT = opts.port;
+  const PORT = 6942;
 
   let generationCount = 0;
 
