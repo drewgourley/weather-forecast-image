@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.2
+
+- Replaced axios with native fetch API to reduce dependency weight
+
 ## 1.5.1
 
 - Sync night icon variants between station and forecast entities for current conditions

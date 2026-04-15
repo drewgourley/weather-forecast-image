@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const Jimp = require('jimp');
@@ -54,8 +53,9 @@ async function fetchHAEntity(entityId) {
     headers['Authorization'] = `Bearer ${SUPERVISOR_TOKEN}`;
   }
   const url = `${HA_API_BASE}/states/${entityId}`;
-  const res = await axios.get(url, { headers });
-  return res.data;
+  const res = await fetch(url, { headers });
+  if (!res.ok) throw new Error(`HA API error ${res.status}: ${res.statusText}`);
+  return res.json();
 }
 
 // Fetch daily forecast via HA weather.get_forecasts service
@@ -65,12 +65,15 @@ async function fetchHAForecast(entityId, type = 'daily') {
     headers['Authorization'] = `Bearer ${SUPERVISOR_TOKEN}`;
   }
   const url = `${HA_API_BASE}/services/weather/get_forecasts?return_response`;
-  const res = await axios.post(url, {
-    entity_id: entityId,
-    type: type,
-  }, { headers });
+  const res = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ entity_id: entityId, type }),
+  });
+  if (!res.ok) throw new Error(`HA forecast error ${res.status}: ${res.statusText}`);
+  const resData = await res.json();
   // HA REST API wraps service responses in "service_response"
-  const data = res.data.service_response || res.data.response || res.data;
+  const data = resData.service_response || resData.response || resData;
   const entityData = data[entityId] || data;
   const forecastList = Array.isArray(entityData.forecast) ? entityData.forecast : Array.isArray(entityData) ? entityData : [];
   return forecastList;
@@ -999,8 +1002,9 @@ async function fetchHomeLocation() {
 
 // Fetch RainViewer weather maps API to get available radar timestamps
 async function fetchRainViewerMaps() {
-  const res = await axios.get('https://api.rainviewer.com/public/weather-maps.json');
-  return res.data;
+  const res = await fetch('https://api.rainviewer.com/public/weather-maps.json');
+  if (!res.ok) throw new Error(`RainViewer API error ${res.status}`);
+  return res.json();
 }
 
 // Convert lat/lon to slippy map tile coordinates and fractional pixel offset
@@ -1018,11 +1022,11 @@ function latLonToTile(lat, lon, zoom) {
 // Download a map tile from CartoDB dark basemap (label-free for 64px clarity)
 async function downloadMapTile(z, x, y) {
   const url = `https://basemaps.cartocdn.com/dark_nolabels/${z}/${x}/${y}.png`;
-  const res = await axios.get(url, {
-    responseType: 'arraybuffer',
+  const res = await fetch(url, {
     headers: { 'User-Agent': 'WeatherForecastGIF-HomeAssistant/1.0' },
   });
-  return Jimp.read(Buffer.from(res.data));
+  if (!res.ok) throw new Error(`Map tile error ${res.status}`);
+  return Jimp.read(Buffer.from(await res.arrayBuffer()));
 }
 
 // Download a radar tile from RainViewer using standard x/y/z tile coordinates
@@ -1030,8 +1034,9 @@ async function downloadRadarTileXYZ(host, framePath, z, x, y, size, colorScheme,
   const smoothVal = smooth ? 1 : 0;
   const snowVal = snow ? 1 : 0;
   const url = `${host}${framePath}/${size}/${z}/${x}/${y}/${colorScheme}/${smoothVal}_${snowVal}.png`;
-  const res = await axios.get(url, { responseType: 'arraybuffer' });
-  return Jimp.read(Buffer.from(res.data));
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Radar tile error ${res.status}`);
+  return Jimp.read(Buffer.from(await res.arrayBuffer()));
 }
 
 // Fetch a 2x2 grid of tiles, stitch, and crop 256x256 centered on lat/lon
