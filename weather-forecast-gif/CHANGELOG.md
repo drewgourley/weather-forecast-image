@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.1
+
+- Sync night icon variants between station and forecast entities for current conditions
+
 ## 1.5.0
 
 - Switched both weather and radar GIFs from gif-encoder (NeuQuant per-frame) to omggif (global color table) for consistent colors across all frames

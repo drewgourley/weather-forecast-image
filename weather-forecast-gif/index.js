@@ -99,6 +99,12 @@ async function fetchWeatherFromHA(forecastEntity, stationEntity) {
       const sAttr = station.attributes;
       currently.forecastIcon = currently.icon; // preserve pirateweather icon
       currently.icon = mapHAConditionToIcon(station.state);
+      // Sync night icon variants: if either entity uses a "-night" icon, apply night to both
+      const isNight = currently.icon.includes('-night') || currently.forecastIcon.includes('-night');
+      if (isNight) {
+        currently.icon = currently.icon.replace('-day', '-night');
+        currently.forecastIcon = currently.forecastIcon.replace('-day', '-night');
+      }
       if (sAttr.temperature !== undefined) currently.temperature = sAttr.temperature;
       if (sAttr.humidity !== undefined) currently.humidity = sAttr.humidity / 100;
     } catch (e) {
