@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.6
+
+- Hard code unnecessary config options
+
+## 1.5.5
+
+- Fix config descriptions... again... again
+
 ## 1.5.4
 
 - Fix config descriptions... again

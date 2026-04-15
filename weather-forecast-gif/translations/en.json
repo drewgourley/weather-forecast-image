@@ -8,25 +8,9 @@
       "name": "Station Entity",
       "description": "An optional weather.* entity for current conditions from a local weather station (e.g. weather.my_station). Leave empty to use the forecast entity for current conditions too."
     },
-    "radar_enabled": {
-      "name": "Enable Radar Map",
-      "description": "Enable or disable the animated radar map GIF served at /radar.gif."
-    },
     "radar_zoom": {
       "name": "Radar Zoom Level",
       "description": "Map zoom level for the radar view (1 = wide, 7 = close). Default: 6."
-    },
-    "radar_color_scheme": {
-      "name": "Radar Color Scheme",
-      "description": "RainViewer color scheme index (0–8). Default: 2."
-    },
-    "radar_smooth": {
-      "name": "Smooth Radar",
-      "description": "Apply smoothing to radar tiles for a cleaner look."
-    },
-    "radar_snow": {
-      "name": "Show Snow on Radar",
-      "description": "Display snow coverage on the radar overlay."
     }
   }
 }

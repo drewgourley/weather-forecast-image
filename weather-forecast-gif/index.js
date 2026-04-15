@@ -15,11 +15,7 @@ function loadOptions() {
   return {
     forecast_entity: process.env.FORECAST_ENTITY || 'weather.pirateweather',
     station_entity: process.env.STATION_ENTITY || '',
-    radar_enabled: (process.env.RADAR_ENABLED || 'true') === 'true',
     radar_zoom: parseInt(process.env.RADAR_ZOOM || '6'),
-    radar_color_scheme: parseInt(process.env.RADAR_COLOR_SCHEME || '2'),
-    radar_smooth: (process.env.RADAR_SMOOTH || 'true') === 'true',
-    radar_snow: (process.env.RADAR_SNOW || 'true') === 'true',
   };
 }
 
@@ -1084,7 +1080,10 @@ function shouldRefreshRadar() {
 
 // Generate animated radar map GIF from RainViewer data
 async function generateRadarGIF(outputFile, opts, overrideLocation) {
-  const { radar_zoom: zoom, radar_color_scheme: colorScheme, radar_smooth: smooth, radar_snow: snow } = opts;
+  const { radar_zoom: zoom } = opts;
+  const colorScheme = 2;
+  const smooth = false;
+  const snow = true;
   const size = 256;
 
   let latitude, longitude;
@@ -1279,20 +1278,18 @@ async function main() {
 
       console.log(`Generating weather GIF #${generationCount}...`);
       await generateGIF(weatherData, outputFile);
-      console.log(`✓ Weather done!`);
+      console.log(`Weather done!`);
     } catch (error) {
-      console.error('❌ Weather error:', error.message);
+      console.error('Weather error:', error.message);
     }
 
-    // Generate radar GIF if enabled
-    if (opts.radar_enabled) {
-      try {
-        console.log(`Generating radar GIF #${generationCount}...`);
-        await generateRadarGIF(radarOutputFile, opts);
-        console.log(`✓ Radar done!`);
-      } catch (error) {
-        console.error('❌ Radar error:', error.message);
-      }
+    // Generate radar GIF
+    try {
+      console.log(`Generating radar GIF #${generationCount}...`);
+      await generateRadarGIF(radarOutputFile, opts);
+      console.log(`✓ Radar done!`);
+    } catch (error) {
+      console.error('Radar error:', error.message);
     }
   }
 
@@ -1300,9 +1297,8 @@ async function main() {
     console.log(`Home Assistant Weather Forecast GIF`);
     console.log(`   Forecast entity: ${forecastEntity}`);
     console.log(`   Station entity:  ${stationEntity || '(none)'}`);
-    console.log(`   Radar enabled:   ${opts.radar_enabled}`);
     console.log(`   Output: ${outputFile}`);
-    if (opts.radar_enabled) console.log(`   Radar output: ${radarOutputFile}`);
+    console.log(`   Radar output: ${radarOutputFile}`);
     console.log(`   Port: ${PORT}`);
     console.log(`Starting continuous GIF generation (every 1 min on the minute)\n`);
     
@@ -1342,7 +1338,7 @@ async function main() {
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`Web server running on port ${PORT}`);
       console.log(`Access the weather GIF at http://<your-ha-ip>:${PORT}/`);
-      if (opts.radar_enabled) console.log(`Access the radar GIF at http://<your-ha-ip>:${PORT}/radar.gif`);
+      console.log(`Access the radar GIF at http://<your-ha-ip>:${PORT}/radar.gif`);
     });
     
     // Run once on startup
