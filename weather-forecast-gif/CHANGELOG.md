@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.7
+
+- Start icon update
+
 ## 1.5.6
 
 - Hard code unnecessary config options
