@@ -95,32 +95,37 @@ function alertSeverityTier(event) {
   return 0;
 }
 
-// Determine 3-letter display code from alert event name keywords
-function parseAlertCode(event) {
-  const e = (event || '').toLowerCase();
-  if (e.includes('tornado'))                         return 'TOR';
+// Determine 3-letter display code from alert event name keywords.
+// If the event alone resolves to WX, a second pass over description is attempted.
+function matchAlertKeywords(text) {
+  const e = (text || '').toLowerCase();
+  if (e.includes('tornado'))                              return 'TOR';
   if (e.includes('thunderstorm') || e.includes('thunder')) return 'THN';
-  if (e.includes('hurricane'))                       return 'HUR';
-  if (e.includes('tropical'))                        return 'TRP';
-  if (e.includes('blizzard'))                        return 'BLZ';
-  if (e.includes('winter'))                          return 'WNT';
-  if (e.includes('snow'))                            return 'SNO';
-  if (e.includes('freezing') || e.includes('ice'))   return 'ICE';
-  if (e.includes('freeze') || e.includes('frost'))   return 'FRZ';
-  if (e.includes('flood'))                           return 'FLO';
-  if (e.includes('rip current'))                     return 'RIP';
-  if (e.includes('fire'))                            return 'FIR';
-  if (e.includes('heat'))                            return 'HEA';
-  if (e.includes('cold'))                            return 'CLD';
-  if (e.includes('wind'))                            return 'WND';
-  if (e.includes('dense') || e.includes('fog'))      return 'FOG';
-  if (e.includes('smoke'))                           return 'SMK';
-  if (e.includes('dust'))                            return 'DST';
-  if (e.includes('avalanche'))                       return 'AVL';
-  if (e.includes('marine') || e.includes('coastal')) return 'CST';
-  if (e.includes('air quality'))                     return 'AIR';
-  if (e.includes('rain'))                            return 'RAN';
-  return 'WX';
+  if (e.includes('hurricane'))                            return 'HUR';
+  if (e.includes('tropical'))                             return 'TRP';
+  if (e.includes('blizzard'))                             return 'BLZ';
+  if (e.includes('winter'))                               return 'WNT';
+  if (e.includes('snow'))                                 return 'SNO';
+  if (e.includes('freezing') || e.includes('ice'))        return 'ICE';
+  if (e.includes('freeze') || e.includes('frost'))        return 'FRZ';
+  if (e.includes('flood'))                                return 'FLO';
+  if (e.includes('rip current'))                          return 'RIP';
+  if (e.includes('fire'))                                 return 'FIR';
+  if (e.includes('heat'))                                 return 'HEA';
+  if (e.includes('cold'))                                 return 'CLD';
+  if (e.includes('wind'))                                 return 'WND';
+  if (e.includes('dense') || e.includes('fog'))           return 'FOG';
+  if (e.includes('smoke'))                                return 'SMK';
+  if (e.includes('dust'))                                 return 'DST';
+  if (e.includes('avalanche'))                            return 'AVL';
+  if (e.includes('marine') || e.includes('coastal'))      return 'CST';
+  if (e.includes('air quality'))                          return 'AIR';
+  if (e.includes('rain'))                                 return 'RAN';
+  return null;
+}
+
+function parseAlertCode(event, description) {
+  return matchAlertKeywords(event) || matchAlertKeywords(description) || 'WX';
 }
 
 // Determine text color for the 3-letter code based on alert type
@@ -164,7 +169,7 @@ async function fetchWeatherAlerts(alertsEntity) {
 
   const top = sorted[0];
   const typeIcon = parseAlertType(top.event);
-  const code = parseAlertCode(top.event);
+  const code = parseAlertCode(top.event, top.description);
   return { typeIcon, code };
 }
 

@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.3
+
+- Parse description for better detection of alert state
+
 ## 1.6.2
 
 - Add special condition for tornado icon
