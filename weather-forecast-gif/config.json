@@ -1,7 +1,7 @@
 {
   "name": "Weather Forecast GIF",
   "description": "Generates an animated 64x64 weather forecast GIF from Home Assistant weather entities, designed for Divoom Pixoo 64 and similar pixel displays",
-  "version": "1.6.1",
+  "version": "1.6.2",
   "slug": "weather_forecast_gif",
   "url": "https://github.com/drewgourley/weather-forecast-image",
   "arch": ["armhf", "armv7", "aarch64", "amd64", "i386"],

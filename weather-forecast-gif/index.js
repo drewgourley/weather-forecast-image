@@ -783,9 +783,13 @@ async function createWeatherImage(currentData, dailyData, frameIndex = 0) {
   // Icon on left, temp on right
   // Frames 0-2: station/current icon (primary-alt-primary)
   // Frames 3-5: forecast icon when entities differ (primary-alt-primary)
-  const useForecastForLarge = frameIndex >= 3 && currentData.forecastIcon;
-  const useAltForLarge = frameIndex === 1 || frameIndex === 4;
-  const currentIconName = useForecastForLarge ? currentData.forecastIcon : currentData.icon;
+  // Exception: tornado watch/warning overrides all frames with the tornado icon
+  const isTornadoAlert = currentData.alert &&
+    (currentData.alert.typeIcon === 'warning-small' || currentData.alert.typeIcon === 'watch-small') &&
+    currentData.alert.code === 'TOR';
+  const useForecastForLarge = !isTornadoAlert && frameIndex >= 3 && currentData.forecastIcon;
+  const useAltForLarge = !isTornadoAlert && (frameIndex === 1 || frameIndex === 4);
+  const currentIconName = isTornadoAlert ? 'tornado' : (useForecastForLarge ? currentData.forecastIcon : currentData.icon);
   const weatherIcon = await loadWeatherIcon(currentIconName, useAltForLarge);
   if (weatherIcon) {
     image.composite(weatherIcon, Math.floor(2), Math.floor(11));
