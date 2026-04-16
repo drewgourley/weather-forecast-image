@@ -15,6 +15,7 @@ function loadOptions() {
   return {
     forecast_entity: process.env.FORECAST_ENTITY || 'weather.pirateweather',
     station_entity: process.env.STATION_ENTITY || '',
+    weatheralerts_entity: process.env.WEATHERALERTS_ENTITY || '',
     radar_zoom: parseInt(process.env.RADAR_ZOOM || '6'),
   };
 }
@@ -74,8 +75,101 @@ async function fetchHAForecast(entityId, type = 'daily') {
   return forecastList;
 }
 
+// Determine alert icon filename (without extension) based on event type keywords
+// Map alert event name to one of three severity-tier icon filenames (without extension)
+// High:   warning-small  — warning, emergency, immediate
+// Medium: watch-small    — watch, important, alert
+// Low:    info-small     — advisory, statement, outlook, message, forecast, test, outage
+function parseAlertType(event) {
+  const e = (event || '').toLowerCase();
+  if (e.includes('emergency') || e.includes('immediate') || e.includes('warning')) return 'warning-small';
+  if (e.includes('watch') || e.includes('important') || e.includes('alert'))       return 'watch-small';
+  return 'info-small';
+}
+
+// Numeric severity tier for sorting (higher = more severe)
+function alertSeverityTier(event) {
+  const e = (event || '').toLowerCase();
+  if (e.includes('emergency') || e.includes('immediate') || e.includes('warning')) return 2;
+  if (e.includes('watch') || e.includes('important') || e.includes('alert'))       return 1;
+  return 0;
+}
+
+// Determine 3-letter display code from alert event name keywords
+function parseAlertCode(event) {
+  const e = (event || '').toLowerCase();
+  if (e.includes('tornado'))                         return 'TOR';
+  if (e.includes('thunderstorm') || e.includes('thunder')) return 'THN';
+  if (e.includes('hurricane'))                       return 'HUR';
+  if (e.includes('tropical'))                        return 'TRP';
+  if (e.includes('blizzard'))                        return 'BLZ';
+  if (e.includes('winter'))                          return 'WNT';
+  if (e.includes('snow'))                            return 'SNO';
+  if (e.includes('freezing') || e.includes('ice'))   return 'ICE';
+  if (e.includes('freeze') || e.includes('frost'))   return 'FRZ';
+  if (e.includes('flood'))                           return 'FLO';
+  if (e.includes('rip current'))                     return 'RIP';
+  if (e.includes('fire'))                            return 'FIR';
+  if (e.includes('heat'))                            return 'HEA';
+  if (e.includes('cold'))                            return 'CLD';
+  if (e.includes('wind'))                            return 'WND';
+  if (e.includes('dense') || e.includes('fog'))      return 'FOG';
+  if (e.includes('smoke'))                           return 'SMK';
+  if (e.includes('dust'))                            return 'DST';
+  if (e.includes('avalanche'))                       return 'AVL';
+  if (e.includes('marine') || e.includes('coastal')) return 'CST';
+  if (e.includes('air quality'))                     return 'AIR';
+  if (e.includes('rain'))                            return 'RAN';
+  return 'WX';
+}
+
+// Determine text color for the 3-letter code based on alert type
+function alertTypeColor(typeIcon) {
+  const map = {
+    'alert-emergency': { r: 255, g: 0,   b: 0   },
+    'alert-immediate': { r: 255, g: 0,   b: 0   },
+    'alert-warning':   { r: 255, g: 68,  b: 0   },
+    'alert-watch':     { r: 255, g: 238, b: 0   },
+    'alert-advisory':  { r: 100, g: 158, b: 238 },
+    'alert-important': { r: 255, g: 170, b: 0   },
+    'alert-alert':     { r: 255, g: 119, b: 0   },
+    'alert-statement': { r: 175, g: 175, b: 175 },
+    'alert-outlook':   { r: 175, g: 175, b: 175 },
+    'alert-message':   { r: 175, g: 175, b: 175 },
+    'alert-forecast':  { r: 175, g: 175, b: 175 },
+    'alert-test':      { r: 125, g: 125, b: 125 },
+    'alert-outage':    { r: 125, g: 125, b: 125 },
+  };
+  return map[typeIcon] || { r: 175, g: 175, b: 175 };
+}
+
+// Fetch and parse the most prominent active alert from the weatheralerts HA entity.
+// When multiple alerts are present, picks the highest severity tier; ties broken
+// by most recent sent/effective time.
+async function fetchWeatherAlerts(alertsEntity) {
+  const entity = await fetchHAEntity(alertsEntity);
+  const alertCount = parseInt(entity.state, 10);
+  if (!alertCount || alertCount < 1) return null;
+  const alerts = entity.attributes.alerts;
+  if (!Array.isArray(alerts) || alerts.length === 0) return null;
+
+  const sorted = [...alerts].sort((a, b) => {
+    const tierDiff = alertSeverityTier(b.event) - alertSeverityTier(a.event);
+    if (tierDiff !== 0) return tierDiff;
+    // Most recent first within the same tier
+    const aTime = new Date(a.sent || a.effective || 0).getTime();
+    const bTime = new Date(b.sent || b.effective || 0).getTime();
+    return bTime - aTime;
+  });
+
+  const top = sorted[0];
+  const typeIcon = parseAlertType(top.event);
+  const code = parseAlertCode(top.event);
+  return { typeIcon, code };
+}
+
 // Fetch weather data from Home Assistant entities
-async function fetchWeatherFromHA(forecastEntity, stationEntity) {
+async function fetchWeatherFromHA(forecastEntity, stationEntity, alertsEntity) {
   const forecast = await fetchHAEntity(forecastEntity);
   const fAttr = forecast.attributes;
 
@@ -134,6 +228,16 @@ async function fetchWeatherFromHA(forecastEntity, stationEntity) {
       temperatureHigh: currently.temperature,
       temperatureLow: currently.temperature,
     });
+  }
+
+  // Fetch active weather alert from weatheralerts entity if configured
+  currently.alert = null;
+  if (alertsEntity) {
+    try {
+      currently.alert = await fetchWeatherAlerts(alertsEntity);
+    } catch (e) {
+      console.error(`Could not fetch alerts entity: ${e.message}`);
+    }
   }
 
   return {
@@ -219,8 +323,8 @@ async function measureTextWidth(text, size = 8) {
 
 // fetchWeatherData — delegates to Home Assistant API
 // (lat/lon kept for signature compatibility but not used)
-async function fetchWeatherData(forecastEntity, stationEntity) {
-  return fetchWeatherFromHA(forecastEntity, stationEntity);
+async function fetchWeatherData(forecastEntity, stationEntity, alertsEntity) {
+  return fetchWeatherFromHA(forecastEntity, stationEntity, alertsEntity);
 }
 
 // Format time short for display (HH:MM only)
@@ -695,42 +799,62 @@ async function createWeatherImage(currentData, dailyData, frameIndex = 0) {
   // Render white on top
   await renderTemperatureBig(image, tempStr, tempBigX, 11, C.white.r, C.white.g, C.white.b);
 
-  // Humidity column between weather icon and big temp
-  const humidityIconPath = path.join(__dirname, 'icons', 'humidity.png');
-  const humidityColX = 26; // right of weather icon (ends ~x=23)
-  let humidityY = 11;
-  try {
-    if (fs.existsSync(humidityIconPath)) {
-      const humidityIcon = await Jimp.read(humidityIconPath);
-      const scaledHumIcon = humidityIcon.clone().resize(9, 9);
-      image.composite(scaledHumIcon, humidityColX, humidityY);
-      humidityY += 10; // 9px icon + 1px gap
-    }
-  } catch (e) { /* skip icon if missing */ }
-  const humidityStr = Math.round(currentData.humidity * 100).toString();
-  await pasteTextColored(image, humidityStr, humidityColX, humidityY, 6, C.forecastHigh.r, C.forecastHigh.g, C.forecastHigh.b);
-  const humidityNumWidth = await measureTextWidth(humidityStr, 6);
-  const percentPath = path.join(__dirname, 'punctuation', 'percent.png');
-  try {
-    if (fs.existsSync(percentPath)) {
-      const percentGlyph = await Jimp.read(percentPath);
-      const tintedPercent = percentGlyph.clone();
-      tintedPercent.scan(0, 0, tintedPercent.bitmap.width, tintedPercent.bitmap.height, (px, py, idx) => {
-        const alpha = tintedPercent.bitmap.data[idx + 3];
-        if (alpha > 0) {
-          tintedPercent.bitmap.data[idx] = C.forecastHigh.r;
-          tintedPercent.bitmap.data[idx + 1] = C.forecastHigh.g;
-          tintedPercent.bitmap.data[idx + 2] = C.forecastHigh.b;
-        }
-      });
-      image.composite(tintedPercent, humidityColX + humidityNumWidth, humidityY);
-    }
-  } catch (e) { /* skip percent if missing */ }
-  // "RH" label centered below humidity number
-  const humidityTotalWidth = humidityNumWidth + (fs.existsSync(percentPath) ? 4 : 0); // approx percent glyph width
-  const rhWidth = await measureTextWidth('RH', 6);
-  const rhX = humidityColX + Math.floor((humidityTotalWidth - rhWidth) / 2) - 1;
-  await pasteTextColored(image, 'RH', rhX, humidityY + 6, 6, C.forecastLow.r, C.forecastLow.g, C.forecastLow.b);
+  // Middle column (x=26): active weather alert replaces humidity for duration of alert
+  const midColX = 26;
+  const midColY = 11;
+  if (currentData.alert) {
+    const { typeIcon, code } = currentData.alert;
+    // Alert type icon (9x9)
+    const alertIconPath = path.join(__dirname, 'icons', `${typeIcon}.png`);
+    try {
+      if (fs.existsSync(alertIconPath)) {
+        const alertIcon = await Jimp.read(alertIconPath);
+        image.composite(alertIcon.clone().resize(9, 9), midColX, midColY);
+      } else {
+        pasteGrayBox(image, midColX, midColY, 9);
+      }
+    } catch (e) { pasteGrayBox(image, midColX, midColY, 9); }
+    // 3-letter code centered below icon
+    const codeWidth = await measureTextWidth(code, 6);
+    const codeX = midColX + Math.floor((9 - codeWidth) / 2) + 1;
+    await pasteTextColored(image, code, codeX, midColY + 10, 6, C.forecastHigh.r, C.forecastHigh.g, C.forecastHigh.b);
+  } else {
+    // Humidity icon + value + RH label
+    const humidityIconPath = path.join(__dirname, 'icons', 'humidity.png');
+    let humidityY = midColY;
+    try {
+      if (fs.existsSync(humidityIconPath)) {
+        const humidityIcon = await Jimp.read(humidityIconPath);
+        const scaledHumIcon = humidityIcon.clone().resize(9, 9);
+        image.composite(scaledHumIcon, midColX, humidityY);
+        humidityY += 10; // 9px icon + 1px gap
+      }
+    } catch (e) { /* skip icon if missing */ }
+    const humidityStr = Math.round(currentData.humidity * 100).toString();
+    await pasteTextColored(image, humidityStr, midColX, humidityY, 6, C.forecastHigh.r, C.forecastHigh.g, C.forecastHigh.b);
+    const humidityNumWidth = await measureTextWidth(humidityStr, 6);
+    const percentPath = path.join(__dirname, 'punctuation', 'percent.png');
+    try {
+      if (fs.existsSync(percentPath)) {
+        const percentGlyph = await Jimp.read(percentPath);
+        const tintedPercent = percentGlyph.clone();
+        tintedPercent.scan(0, 0, tintedPercent.bitmap.width, tintedPercent.bitmap.height, (px, py, idx) => {
+          const alpha = tintedPercent.bitmap.data[idx + 3];
+          if (alpha > 0) {
+            tintedPercent.bitmap.data[idx] = C.forecastHigh.r;
+            tintedPercent.bitmap.data[idx + 1] = C.forecastHigh.g;
+            tintedPercent.bitmap.data[idx + 2] = C.forecastHigh.b;
+          }
+        });
+        image.composite(tintedPercent, midColX + humidityNumWidth, humidityY);
+      }
+    } catch (e) { /* skip percent if missing */ }
+    // "RH" label centered below humidity number
+    const humidityTotalWidth = humidityNumWidth + (fs.existsSync(percentPath) ? 4 : 0);
+    const rhWidth = await measureTextWidth('RH', 6);
+    const rhX = midColX + Math.floor((humidityTotalWidth - rhWidth) / 2) - 1;
+    await pasteTextColored(image, 'RH', rhX, humidityY + 6, 6, C.forecastLow.r, C.forecastLow.g, C.forecastLow.b);
+  }
   
   // Today's high and low temperatures
   const todayHighStr = Math.round(dailyData[0].temperatureHigh) + '°';
@@ -1300,6 +1424,7 @@ async function main() {
   const opts = loadOptions();
   const forecastEntity = opts.forecast_entity;
   const stationEntity = opts.station_entity;
+  const alertsEntity = opts.weatheralerts_entity;
   const outputFile = '/data/weather-forecast.gif';
   const radarOutputFile = '/data/radar-map.gif';
   const PORT = 6942;
@@ -1311,7 +1436,7 @@ async function main() {
 
     try {
       console.log(`\nFetching weather from Home Assistant... [${new Date().toLocaleTimeString()}]`);
-      const weatherData = await fetchWeatherData(forecastEntity, stationEntity);
+      const weatherData = await fetchWeatherData(forecastEntity, stationEntity, alertsEntity);
 
       // Print weather data to console
       const current = weatherData.currently;
@@ -1345,8 +1470,9 @@ async function main() {
 
   try {
     console.log(`Home Assistant Weather Forecast GIF`);
-    console.log(`   Forecast entity: ${forecastEntity}`);
-    console.log(`   Station entity:  ${stationEntity || '(none)'}`);
+    console.log(`   Forecast entity:  ${forecastEntity}`);
+    console.log(`   Station entity:   ${stationEntity || '(none)'}`);
+    console.log(`   Alerts entity:    ${alertsEntity || '(none)'}`);
     console.log(`   Output: ${outputFile}`);
     console.log(`   Radar output: ${radarOutputFile}`);
     console.log(`   Port: ${PORT}`);

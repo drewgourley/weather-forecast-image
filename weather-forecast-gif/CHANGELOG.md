@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.1
+
+- Feature: Optional `weatheralerts_entity` (weatheralerts HACS integration) — active alerts replace the humidity column with an alert type icon and 3-letter event code (TOR, THU, FLO, etc.); RH returns when no alerts are active
+
 ## 1.6.0
 
 - Finalize icon updates
