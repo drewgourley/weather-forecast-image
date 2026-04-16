@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.0
+
+- Finalize icon updates
+
 ## 1.5.9
 
 - Even more icon updates

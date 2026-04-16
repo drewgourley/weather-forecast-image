@@ -301,9 +301,9 @@ async function loadWeatherIcon(condition, useAlt = false) {
   
   // Exact matches first (for day/night variants)
   if (condition === 'clear-day') {
-    filename = 'clear-day.png';
+    filename = useAlt ? 'clear-day-alt.png' : 'clear-day.png';
   } else if (condition === 'clear-night') {
-    filename = 'clear-night.png';
+    filename = useAlt ? 'clear-night-alt.png' : 'clear-night.png';
   } else if (condition === 'partly-cloudy-day') {
     filename = useAlt ? 'partly-cloudy-day-alt.png' : 'partly-cloudy-day.png';
   } else if (condition === 'partly-cloudy-night') {
@@ -313,27 +313,27 @@ async function loadWeatherIcon(condition, useAlt = false) {
   else if (condition.includes('rain')) {
     filename = useAlt ? 'rain-alt.png' : 'rain.png';
   } else if (condition.includes('snow')) {
-    filename = 'snow.png';
+    filename = useAlt ? 'snow-alt.png' : 'snow.png';
   } else if (condition.includes('sleet')) {
-    filename = 'sleet.png';
+    filename = useAlt ? 'sleet-alt.png' : 'sleet.png';
   } else if (condition.includes('wind')) {
     filename = useAlt ? 'wind-alt.png' : 'wind.png';
   } else if (condition.includes('fog')) {
-    filename = 'fog.png';
+    filename = useAlt ? 'fog-alt.png' : 'fog.png';
   } else if (condition.includes('cloud')) {
     filename = useAlt ? 'cloudy-alt.png' : 'cloudy.png';
   } else if (condition.includes('hail')) {
-    filename = 'hail.png';
+    filename = useAlt ? 'hail-alt.png' : 'hail.png';
   } else if (condition.includes('thunder')) {
     filename = useAlt ? 'thunderstorm-alt.png' : 'thunderstorm.png';
   } else if (condition.includes('tornado')) {
     filename = 'tornado.png';
   } else if (condition.includes('smoke')) {
-    filename = 'smoke.png';
+    filename = useAlt ? 'smoke-alt.png' : 'smoke.png';
   } else if (condition.includes('haze')) {
-    filename = 'haze.png';
+    filename = useAlt ? 'haze-alt.png' : 'haze.png';
   } else if (condition.includes('mist')) {
-    filename = 'mist.png';
+    filename = useAlt ? 'mist-alt.png' : 'mist.png';
   } else {
     filename = 'unknown.png'; // Default fallback
   }
@@ -350,6 +350,54 @@ async function loadWeatherIcon(condition, useAlt = false) {
   }
   
   return null;
+}
+
+// Load small (9x9) weather icon from icons folder
+async function loadSmallWeatherIcon(condition, useAlt = false) {
+  let filename;
+
+  if (condition === 'clear-day' || condition === 'clear-night' || condition.includes('clear')) {
+    filename = 'clear-small.png';
+  } else if (condition.includes('partly-cloudy')) {
+    filename = 'partly-cloudy-small.png';
+  } else if (condition.includes('rain')) {
+    filename = useAlt ? 'rain-small-alt.png' : 'rain-small.png';
+  } else if (condition.includes('snow')) {
+    filename = useAlt ? 'snow-small-alt.png' : 'snow-small.png';
+  } else if (condition.includes('sleet')) {
+    filename = useAlt ? 'sleet-small-alt.png' : 'sleet-small.png';
+  } else if (condition.includes('wind')) {
+    filename = useAlt ? 'wind-small-alt.png' : 'wind-small.png';
+  } else if (condition.includes('fog')) {
+    filename = 'fog-small.png';
+  } else if (condition.includes('cloud')) {
+    filename = 'cloudy-small.png';
+  } else if (condition.includes('hail')) {
+    filename = useAlt ? 'hail-small-alt.png' : 'hail-small.png';
+  } else if (condition.includes('thunder')) {
+    filename = useAlt ? 'thunderstorm-small-alt.png' : 'thunderstorm-small.png';
+  } else if (condition.includes('smoke')) {
+    filename = 'smoke-small.png';
+  } else if (condition.includes('haze')) {
+    filename = 'haze-small.png';
+  } else if (condition.includes('mist')) {
+    filename = useAlt ? 'mist-small-alt.png' : 'mist-small.png';
+  } else {
+    // No small variant — fall back to full-size icon
+    return loadWeatherIcon(condition, useAlt);
+  }
+
+  const filepath = path.join(__dirname, 'icons', filename);
+  try {
+    if (fs.existsSync(filepath)) {
+      return await Jimp.read(filepath);
+    }
+  } catch (e) {
+    console.error(`Failed to load small weather icon '${filename}':`, e.message);
+  }
+
+  // Fallback to full-size if small file is missing
+  return loadWeatherIcon(condition, useAlt);
 }
 
 // Draw gray FPO placeholder box
@@ -551,7 +599,7 @@ async function renderHeader(image) {
 }
 
 // Create weather display image using Jimp at 64x64 pixel-perfect rendering
-async function createWeatherImage(currentData, dailyData, isAnimationFrame2 = false) {
+async function createWeatherImage(currentData, dailyData, frameIndex = 0) {
   const width = 64;
   const height = 64;
   const image = new Jimp(width, height, 0x000000ff); // Black background
@@ -629,11 +677,12 @@ async function createWeatherImage(currentData, dailyData, isAnimationFrame2 = fa
   
   // Main section: Animated weather icon and temperature
   // Icon on left, temp on right
-  // Frame 1: station icon, Frame 2: pirateweather forecast icon (no alt)
-  const currentIconName = isAnimationFrame2 && currentData.forecastIcon
-    ? currentData.forecastIcon
-    : currentData.icon;
-  const weatherIcon = await loadWeatherIcon(currentIconName, false);
+  // Frames 0-2: station/current icon (primary-alt-primary)
+  // Frames 3-5: forecast icon when entities differ (primary-alt-primary)
+  const useForecastForLarge = frameIndex >= 3 && currentData.forecastIcon;
+  const useAltForLarge = frameIndex === 1 || frameIndex === 4;
+  const currentIconName = useForecastForLarge ? currentData.forecastIcon : currentData.icon;
+  const weatherIcon = await loadWeatherIcon(currentIconName, useAltForLarge);
   if (weatherIcon) {
     image.composite(weatherIcon, Math.floor(2), Math.floor(11));
   } else {
@@ -734,7 +783,8 @@ async function createWeatherImage(currentData, dailyData, isAnimationFrame2 = fa
     await pasteTextColored(image, dayLabel, colX - dayLabelWidth / 2, 36, 6, C.white.r, C.white.g, C.white.b);
     
     // Weather icon (centered in column, scaled to 9x9)
-    const forecastIcon = await loadWeatherIcon(day.icon, isAnimationFrame2);
+    const useAltForSmall = frameIndex % 2 === 1; // odd frames (1,3,5) use alt
+    const forecastIcon = await loadSmallWeatherIcon(day.icon, useAltForSmall);
     if (forecastIcon) {
       const scaledIcon = forecastIcon.clone().resize(9, 9);
       image.composite(scaledIcon, Math.floor(colX - 4.5), Math.floor(42));
@@ -791,12 +841,12 @@ const FIXED_RADAR_COLORS = {
   darkMagenta:   { r: 170, g: 0, b: 170 },    // dark magenta
 };
 
-// Build a unified palette from both animation frames
-function buildUnifiedPalette(frame1, frame2) {
+// Build a unified palette from all animation frames
+function buildUnifiedPalette(rawFrames) {
   const colorCounts = new Map();
 
-  // Count all unique colors across both frames
-  for (const frame of [frame1, frame2]) {
+  // Count all unique colors across all frames
+  for (const frame of rawFrames) {
     for (let i = 0; i < frame.length; i += 4) {
       const a = frame[i + 3];
       if (a < 128) continue;
@@ -935,14 +985,15 @@ async function generateGIF(weatherData, outputFile = './weather-forecast.gif') {
 
   console.log('  Creating animation frames...');
 
-  // Create both animation frames (raw RGBA buffers)
-  const rawFrame1 = await createWeatherImage(currentData, dailyData, false);
-  const rawFrame2 = await createWeatherImage(currentData, dailyData, true);
+  // Create 6 animation frames (raw RGBA buffers)
+  const rawFrames = [];
+  for (let i = 0; i < 6; i++) {
+    rawFrames.push(await createWeatherImage(currentData, dailyData, i));
+  }
 
-  // Pre-quantize both frames to a unified palette so colors don't shift
-  const unifiedPalette = buildUnifiedPalette(rawFrame1, rawFrame2);
-  const frame1 = remapFrameToPalette(rawFrame1, unifiedPalette);
-  const frame2 = remapFrameToPalette(rawFrame2, unifiedPalette);
+  // Pre-quantize all frames to a unified palette so colors don't shift
+  const unifiedPalette = buildUnifiedPalette(rawFrames);
+  const quantizedFrames = rawFrames.map(f => remapFrameToPalette(f, unifiedPalette));
 
   // Build palette as array of 0xRRGGBB ints for omggif (must be 256 entries)
   const gifPalette = new Array(256).fill(0);
@@ -959,8 +1010,7 @@ async function generateGIF(weatherData, outputFile = './weather-forecast.gif') {
 
   // Convert each RGBA frame to palette-indexed pixels
   const nPix = 64 * 64;
-  const frames = [frame1, frame2];
-  const indexedFrames = frames.map(frame => {
+  const indexedFrames = quantizedFrames.map(frame => {
     const indexed = new Uint8Array(nPix);
     for (let i = 0; i < nPix; i++) {
       const off = i * 4;
