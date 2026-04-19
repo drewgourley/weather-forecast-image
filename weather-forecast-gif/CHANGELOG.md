@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.4
+
+- Error hardening
+
 ## 1.6.3
 
 - Parse description for better detection of alert state

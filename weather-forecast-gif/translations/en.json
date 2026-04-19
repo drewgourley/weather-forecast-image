@@ -8,6 +8,10 @@
       "name": "Station Entity",
       "description": "An optional weather.* entity for current conditions from a local weather station (e.g. weather.my_station). Leave empty to use the forecast entity for current conditions too."
     },
+    "weatheralerts_entity": {
+      "name": "Weather Alerts Entity",
+      "description": "An optional weatheralerts integration entity (e.g. weatheralerts.my_alerts). When active alerts are present, the humidity column is replaced with an alert severity icon and 3-letter event code. Leave empty to disable."
+    },
     "radar_zoom": {
       "name": "Radar Zoom Level",
       "description": "Map zoom level for the radar view (1 = wide, 7 = close). Default: 6."

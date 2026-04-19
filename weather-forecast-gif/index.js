@@ -1474,6 +1474,15 @@ async function main() {
       console.log(`✓ Radar done!`);
     } catch (error) {
       console.error('Radar error:', error.message);
+      // Fall back to serving a copy of the forecast GIF
+      try {
+        if (fs.existsSync(outputFile)) {
+          fs.copyFileSync(outputFile, radarOutputFile);
+          console.log('  Radar fallback: serving copy of forecast GIF');
+        }
+      } catch (copyErr) {
+        console.error('  Radar fallback copy failed:', copyErr.message);
+      }
     }
   }
 
