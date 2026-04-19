@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.6.5
+
+- Atomic GIF writes: output is written to a temp file then renamed, so the display never reads a partially-written file
+- Per-frame error isolation in weather GIF: if one animation frame fails to render, the last good frame is reused instead of aborting
+- Added `weatheralerts_entity` to translations
+
 ## 1.6.4
 
 - Error hardening

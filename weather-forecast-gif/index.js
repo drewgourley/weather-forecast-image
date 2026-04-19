@@ -1119,9 +1119,19 @@ async function generateGIF(weatherData, outputFile = './weather-forecast.gif') {
   console.log('  Creating animation frames...');
 
   // Create 6 animation frames (raw RGBA buffers)
+  // If a single frame fails, reuse the last good frame so the GIF stays valid
+  const blankFrame = Buffer.alloc(64 * 64 * 4, 0);
   const rawFrames = [];
+  let lastGoodFrame = blankFrame;
   for (let i = 0; i < 6; i++) {
-    rawFrames.push(await createWeatherImage(currentData, dailyData, i));
+    try {
+      const frame = await createWeatherImage(currentData, dailyData, i);
+      lastGoodFrame = frame;
+      rawFrames.push(frame);
+    } catch (e) {
+      console.error(`  Frame ${i} render error: ${e.message} — reusing last good frame`);
+      rawFrames.push(lastGoodFrame);
+    }
   }
 
   // Pre-quantize all frames to a unified palette so colors don't shift
@@ -1163,7 +1173,10 @@ async function generateGIF(weatherData, outputFile = './weather-forecast.gif') {
     gif.addFrame(0, 0, width, height, indexed, { delay: 94 }); // 940ms in centiseconds
   }
 
-  fs.writeFileSync(outputFile, buf.slice(0, gif.end()));
+  // Atomic write: write to temp file then rename so the Pixoo never reads a partial file
+  const tmpWeatherFile = outputFile + '.tmp';
+  fs.writeFileSync(tmpWeatherFile, buf.slice(0, gif.end()));
+  fs.renameSync(tmpWeatherFile, outputFile);
   console.log(`✓ Weather GIF generated: ${outputFile}`);
 }
 
@@ -1424,7 +1437,10 @@ async function generateRadarGIF(outputFile, opts, overrideLocation) {
     });
   }
 
-  fs.writeFileSync(outputFile, buf.slice(0, gif.end()));
+  // Atomic write: write to temp file then rename so the Pixoo never reads a partial file
+  const tmpRadarFile = outputFile + '.tmp';
+  fs.writeFileSync(tmpRadarFile, buf.slice(0, gif.end()));
+  fs.renameSync(tmpRadarFile, outputFile);
   console.log(`✓ Radar GIF generated: ${outputFile}`);
 }
 
