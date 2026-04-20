@@ -22,7 +22,7 @@ The weather GIF is a 64×64 pixel animated image:
 
 | Weather forecast | Active alert | Radar map |
 |:---:|:---:|:---:|
-| ![Weather forecast example](https://raw.githubusercontent.com/drewgourley/weather-forecast-image/main/weather-forecast-gif/examples/example-output.gif) | ![Active alert example](https://raw.githubusercontent.com/drewgourley/weather-forecast-image/main/weather-forecast-gif/examples/example-alert.gif) | ![Radar map example](https://raw.githubusercontent.com/drewgourley/weather-forecast-image/main/weather-forecast-gif/examples/example-radar.gif) |
+| ![Weather forecast example](https://raw.githubusercontent.com/drewgourley/weather-forecast-image/refs/heads/master/weather-forecast-gif/examples/example-output.gif) | ![Active alert example](https://raw.githubusercontent.com/drewgourley/weather-forecast-image/refs/heads/master/weather-forecast-gif/examples/example-alert.gif) | ![Radar map example](https://raw.githubusercontent.com/drewgourley/weather-forecast-image/refs/heads/master/weather-forecast-gif/examples/example-radar.gif) |
 
 ## Endpoints
 
