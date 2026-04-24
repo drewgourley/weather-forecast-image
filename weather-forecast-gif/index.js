@@ -1305,8 +1305,10 @@ async function generateRadarGIF(outputFile, opts, overrideLocation) {
     mapTileCacheKey = cacheKey;
   }
 
-  // Only re-fetch radar data on the 10s+1 schedule, or if no cache exists
-  const needsRadarRefresh = !radarBaseFramesCache || shouldRefreshRadar();
+  // Only re-fetch radar data on the 10s+1 schedule, or if no valid cache exists.
+  // NOTE: !radarBaseFramesCache alone is insufficient — an empty [] is falsy for !
+  // but still means no frames, which produces a 0-frame (dead) GIF.
+  const needsRadarRefresh = !radarBaseFramesCache || radarBaseFramesCache.length === 0 || shouldRefreshRadar();
 
   if (needsRadarRefresh) {
     console.log('  Fetching RainViewer radar data...');
@@ -1321,8 +1323,11 @@ async function generateRadarGIF(outputFile, opts, overrideLocation) {
     }
 
     console.log(`  Downloading ${frames.length} radar frames...`);
-    radarBaseFramesCache = [];
-    radarFrameTimestamps = [];
+    // Build into local arrays first; only commit to module cache after all
+    // frames succeed. This prevents a failed download from leaving the cache
+    // at [] (empty), which would cause the next call to produce a 0-frame GIF.
+    const newFramesCache = [];
+    const newTimestampsCache = [];
     for (const frame of frames) {
       const radarTile = await fetchCenteredTiles(latitude, longitude, zoom,
         (z, x, y) => downloadRadarTileXYZ(host, frame.path, z, x, y, size, colorScheme, smooth, snow));
@@ -1344,9 +1349,12 @@ async function generateRadarGIF(outputFile, opts, overrideLocation) {
       const shifted = new Jimp(64, 64, 0x000000FF);
       shifted.composite(composited, 0, 4);
 
-      radarBaseFramesCache.push(shifted);
-      radarFrameTimestamps.push(frame.time);
+      newFramesCache.push(shifted);
+      newTimestampsCache.push(frame.time);
     }
+    // All frames downloaded successfully — commit to cache atomically
+    radarBaseFramesCache = newFramesCache;
+    radarFrameTimestamps = newTimestampsCache;
   } else {
     console.log('  Using cached radar frames (next refresh at xx:x1)');
   }

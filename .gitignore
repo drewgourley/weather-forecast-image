@@ -14,3 +14,5 @@ test-alert.js
 test-output.gif
 test-radar.gif
 test-alert.gif
+test-radar-fail.js
+test-radar-fail-output.gif
