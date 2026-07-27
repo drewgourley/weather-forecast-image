@@ -219,6 +219,7 @@ async function fetchWeatherFromHA(forecastEntity, stationEntity, alertsEntity) {
         icon: mapHAConditionToIcon(entry.condition),
         temperatureHigh: entry.temperature ?? entry.templow ?? 0,
         temperatureLow: entry.templow ?? entry.temperature ?? 0,
+        precipProbability: entry.precipitation_probability ?? null,
       });
     }
   } catch (e) {
@@ -232,6 +233,7 @@ async function fetchWeatherFromHA(forecastEntity, stationEntity, alertsEntity) {
       icon: currently.icon,
       temperatureHigh: currently.temperature,
       temperatureLow: currently.temperature,
+      precipProbability: null,
     });
   }
 
@@ -707,6 +709,29 @@ async function renderHeader(image) {
   await pasteTextColored(image, dayStr, dayX, 1, 7, C.accent.r, C.accent.g, C.accent.b);
 }
 
+// Draw a rain-chance bar: dark gray background filled from the bottom with rain
+// blue proportional to precipitation probability (0-100). `width` sets the bar
+// thickness in pixels. Skips drawing entirely when the probability is unavailable.
+function drawRainBar(image, x, yTop, height, pct, width = 1) {
+  if (pct === null || pct === undefined || Number.isNaN(pct)) return;
+  const bg = FIXED_UI_COLORS.divider;      // dark gray background
+  const fill = FIXED_RADAR_COLORS.rain;    // rain blue fill
+  const clamped = Math.max(0, Math.min(100, pct));
+  const filled = Math.round((clamped / 100) * height);
+  for (let i = 0; i < height; i++) {
+    const y = yTop + i;
+    const fromBottom = height - i; // 1..height, counts up from the bottom row
+    const col = fromBottom <= filled ? fill : bg;
+    for (let w = 0; w < width; w++) {
+      const idx = (image.bitmap.width * y + (x + w)) * 4;
+      image.bitmap.data[idx] = col.r;
+      image.bitmap.data[idx + 1] = col.g;
+      image.bitmap.data[idx + 2] = col.b;
+      image.bitmap.data[idx + 3] = 255;
+    }
+  }
+}
+
 // Create weather display image using Jimp at 64x64 pixel-perfect rendering
 async function createWeatherImage(currentData, dailyData, frameIndex = 0) {
   const width = 64;
@@ -802,14 +827,18 @@ async function createWeatherImage(currentData, dailyData, frameIndex = 0) {
     pasteGrayBox(image, 2, 11, 21);
   }
   const tempBigWidth = await measureBigNumberWidth(tempStr);
-  const tempBigX = 64 - tempBigWidth; // right-aligned flush
+  const tempBigX = 65 - tempBigWidth; // right-aligned, nudged 1px right toward the degree dot
   // Render shadow behind
   await renderTemperatureBig(image, tempStr, tempBigX + 1, 12, C.divider.r, C.divider.g, C.divider.b);
   // Render white on top
   await renderTemperatureBig(image, tempStr, tempBigX, 11, C.white.r, C.white.g, C.white.b);
 
-  // Middle column (x=26): active weather alert replaces humidity for duration of alert
-  const midColX = 26;
+  // Current-conditions rain-chance bar (today's precip probability): a 2px-wide
+  // full-height column just left of the temperature data.
+  drawRainBar(image, 24, 11, 21, dailyData[0].precipProbability, 2);
+
+  // Middle column: active weather alert replaces humidity for duration of alert
+  const midColX = 28;
   const midColY = 11;
   if (currentData.alert) {
     const { typeIcon, code } = currentData.alert;
@@ -882,7 +911,7 @@ async function createWeatherImage(currentData, dailyData, frameIndex = 0) {
   const todayStartX = 63 - totalTodayWidth; // right-aligned with 1px margin
   
   let todayX = todayStartX;
-  await pasteTextColored(image, todayHighStr, todayX + 2, 27, 6, C.todayHigh.r, C.todayHigh.g, C.todayHigh.b);
+  await pasteTextColored(image, todayHighStr, todayX + 3, 27, 6, C.todayHigh.r, C.todayHigh.g, C.todayHigh.b);
   todayX += todayHighWidth + 1;
   
   // Paste pipe glyph tinted to divider color
@@ -897,7 +926,7 @@ async function createWeatherImage(currentData, dailyData, frameIndex = 0) {
         tintedPipe.bitmap.data[idx + 3] = alpha;
       }
     });
-    image.composite(tintedPipe, Math.floor(todayX), Math.floor(27));
+    image.composite(tintedPipe, Math.floor(todayX + 1), Math.floor(27));
   }
   
   todayX += pipeWidth + 1;
@@ -909,7 +938,10 @@ async function createWeatherImage(currentData, dailyData, frameIndex = 0) {
   for (let i = 1; i < 5 && i < dailyData.length; i++) {
     const day = dailyData[i];
     const colX = columnCenters[i - 1];
-    
+
+    // Rain-chance bar on the left edge of the column (drawn first so text wins if cramped)
+    drawRainBar(image, colX - 7, 42, 21, day.precipProbability);
+
     // Day abbreviation (first 2 letters)
     const dayLabel = getDayOfWeek(day.time).substring(0, 2);
     const dayLabelWidth = await measureTextWidth(dayLabel, 6);
