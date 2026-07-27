@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.07.27.0
+
+- Add rain-chance bars: per-day precipitation probability indicators on the forecast row and a full-height bar in the current conditions section
+
 ## 2026.04.23.0
 
 - Improve API Error fallbacks and gif generation
