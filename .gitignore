@@ -9,10 +9,4 @@ weather-forecast.gif
 out/
 .idea/
 .vscode/settings.json
-test-local.js
-test-alert.js
-test-output.gif
-test-radar.gif
-test-alert.gif
-test-radar-fail.js
-test-radar-fail-output.gif
+test-*

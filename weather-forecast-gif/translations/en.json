@@ -15,6 +15,18 @@
     "radar_zoom": {
       "name": "Radar Zoom Level",
       "description": "Map zoom level for the radar view (1 = wide, 7 = close). Default: 6."
+    },
+    "show_time": {
+      "name": "Show Time",
+      "description": "Show the current time in the header. Turn off to display only the date and day of week, useful when the GIF stays on screen a long time and a frozen clock would look stale. Default: on."
+    },
+    "date_format": {
+      "name": "Date Format",
+      "description": "How the header date is displayed. Use MM for month and DD for day; any other characters (such as -, ., or /) are literal separators. Years are not supported. Examples: MM-DD, DD.MM., MM/DD. Default: MM-DD."
+    },
+    "time_format": {
+      "name": "Time Format",
+      "description": "12-hour clock with AM/PM (12h) or 24-hour clock (24h). Also applies to the radar frame timestamps. Default: 12h."
     }
   }
 }

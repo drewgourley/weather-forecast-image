@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.09.10.0
+
+- Add human-readable names and descriptions for the configuration options in the add-on Configuration tab
+
 ## 2026.09.09.1
 
 - Add `show_time` option to hide the time in the header, leaving only the date and day of week
