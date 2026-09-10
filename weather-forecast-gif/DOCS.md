@@ -35,6 +35,10 @@ Leave empty to disable alert display.
 
 Map zoom level for the radar view (1–7). Lower values show a wider area; higher values show more local detail. Default: `6`.
 
+### Show Time
+
+Whether to render the current time in the header row. When enabled (the default), the header shows the date, time, and day of week. Set to `false` to show only the date and day of week — useful when the GIF stays on the display for a long time and a static clock would become misleading. Default: `true`.
+
 ## Endpoints
 
 The add-on runs a web server on port `6942`. The GIFs are served at:
@@ -47,7 +51,7 @@ The add-on runs a web server on port `6942`. The GIFs are served at:
 
 The weather GIF is a 64×64 pixel animated image:
 
-- **Header row**: Date (MM•DD), time (H:MM AM/PM), day of week
+- **Header row**: Date (MM•DD), time (H:MM AM/PM), day of week (time can be hidden via the `show_time` option)
 - **Main section**: Animated weather icon + current temperature; humidity (or active alert) in the center column
 - **Today's high/low**: Yellow high, blue low
 - **4-day forecast**: Day labels, weather icons, high/low temps

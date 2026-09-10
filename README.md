@@ -21,7 +21,7 @@ This add-on is designed to work with the following Home Assistant integrations:
 
 The weather GIF is a 64×64 pixel animated image:
 
-- **Header row**: Date (MM•DD), time (H:MM AM/PM), day of week
+- **Header row**: Date (MM•DD), time (H:MM AM/PM), day of week (time can be hidden via the `show_time` option)
 - **Main section**: Animated weather icon + current temperature; humidity (or active alert) in the center column
 - **Today's high/low**: Yellow high, blue low
 - **4-day forecast**: Day labels, weather icons, high/low temps

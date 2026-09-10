@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026.09.09.0
+
+- Add `show_time` option to hide the time in the header, leaving only the date and day of week
+
 ## 2026.07.27.0
 
 - Add rain-chance bars: per-day precipitation probability indicators on the forecast row and a full-height bar in the current conditions section

@@ -17,6 +17,7 @@ function loadOptions() {
     station_entity: process.env.STATION_ENTITY || '',
     weatheralerts_entity: process.env.WEATHERALERTS_ENTITY || '',
     radar_zoom: parseInt(process.env.RADAR_ZOOM || '6'),
+    show_time: process.env.SHOW_TIME !== 'false',
   };
 }
 
@@ -618,7 +619,7 @@ async function renderTemperatureBig(image, tempStr, x, y, r = 255, g = 255, b = 
 }
 
 // Render the date/time/day header onto an image (rows y=0..8, with divider at y=8)
-async function renderHeader(image) {
+async function renderHeader(image, showTime = true) {
   const C = FIXED_UI_COLORS;
 
   // Black background behind header (y=0 to y=9 inclusive, extra row for 2px legend)
@@ -689,21 +690,24 @@ async function renderHeader(image) {
   const timeX = Math.max(dateEndX + 1, timeCenterX - totalTimeWidth / 2);
 
   await pasteTextColored(image, dateStr, dateX, 1, 7, C.alternate.r, C.alternate.g, C.alternate.b);
-  await pasteTextColored(image, timeStr, timeX, 1, 7, C.white.r, C.white.g, C.white.b);
 
-  if (ampmGlyph) {
-    const tintedAmpm = ampmGlyph.clone();
-    tintedAmpm.scan(0, 0, tintedAmpm.bitmap.width, tintedAmpm.bitmap.height, (px, py, idx) => {
-      const alpha = tintedAmpm.bitmap.data[idx + 3];
-      if (alpha > 0) {
-        tintedAmpm.bitmap.data[idx] = C.white.r;
-        tintedAmpm.bitmap.data[idx + 1] = C.white.g;
-        tintedAmpm.bitmap.data[idx + 2] = C.white.b;
-      }
-    });
-    const ampmX = timeX + timeWidth;
-    const ampmY = 1 + (7 - tintedAmpm.bitmap.height) - 2;
-    image.composite(tintedAmpm, Math.floor(ampmX), Math.floor(ampmY));
+  if (showTime) {
+    await pasteTextColored(image, timeStr, timeX, 1, 7, C.white.r, C.white.g, C.white.b);
+
+    if (ampmGlyph) {
+      const tintedAmpm = ampmGlyph.clone();
+      tintedAmpm.scan(0, 0, tintedAmpm.bitmap.width, tintedAmpm.bitmap.height, (px, py, idx) => {
+        const alpha = tintedAmpm.bitmap.data[idx + 3];
+        if (alpha > 0) {
+          tintedAmpm.bitmap.data[idx] = C.white.r;
+          tintedAmpm.bitmap.data[idx + 1] = C.white.g;
+          tintedAmpm.bitmap.data[idx + 2] = C.white.b;
+        }
+      });
+      const ampmX = timeX + timeWidth;
+      const ampmY = 1 + (7 - tintedAmpm.bitmap.height) - 2;
+      image.composite(tintedAmpm, Math.floor(ampmX), Math.floor(ampmY));
+    }
   }
 
   await pasteTextColored(image, dayStr, dayX, 1, 7, C.accent.r, C.accent.g, C.accent.b);
@@ -733,7 +737,7 @@ function drawRainBar(image, x, yTop, height, pct, width = 1) {
 }
 
 // Create weather display image using Jimp at 64x64 pixel-perfect rendering
-async function createWeatherImage(currentData, dailyData, frameIndex = 0) {
+async function createWeatherImage(currentData, dailyData, frameIndex = 0, showTime = true) {
   const width = 64;
   const height = 64;
   const image = new Jimp(width, height, 0x000000ff); // Black background
@@ -789,22 +793,25 @@ async function createWeatherImage(currentData, dailyData, frameIndex = 0) {
   const timeX = Math.max(dateEndX + 1, timeCenterX - totalTimeWidth / 2); // don't overlap with date
   
   await pasteTextColored(image, dateStr, dateX, 1, 7, C.alternate.r, C.alternate.g, C.alternate.b);
-  await pasteTextColored(image, timeStr, timeX, 1, 7, C.white.r, C.white.g, C.white.b);
   
-  // Append AM/PM glyph after time text
-  if (ampmGlyph) {
-    const tintedAmpm = ampmGlyph.clone();
-    tintedAmpm.scan(0, 0, tintedAmpm.bitmap.width, tintedAmpm.bitmap.height, (px, py, idx) => {
-      const alpha = tintedAmpm.bitmap.data[idx + 3];
-      if (alpha > 0) {
-        tintedAmpm.bitmap.data[idx] = C.white.r;
-        tintedAmpm.bitmap.data[idx + 1] = C.white.g;
-        tintedAmpm.bitmap.data[idx + 2] = C.white.b;
-      }
-    });
-    const ampmX = timeX + timeWidth;
-    const ampmY = 1 + (7 - tintedAmpm.bitmap.height) - 2; // bottom-align with time text, shifted up 2px
-    image.composite(tintedAmpm, Math.floor(ampmX), Math.floor(ampmY));
+  if (showTime) {
+    await pasteTextColored(image, timeStr, timeX, 1, 7, C.white.r, C.white.g, C.white.b);
+    
+    // Append AM/PM glyph after time text
+    if (ampmGlyph) {
+      const tintedAmpm = ampmGlyph.clone();
+      tintedAmpm.scan(0, 0, tintedAmpm.bitmap.width, tintedAmpm.bitmap.height, (px, py, idx) => {
+        const alpha = tintedAmpm.bitmap.data[idx + 3];
+        if (alpha > 0) {
+          tintedAmpm.bitmap.data[idx] = C.white.r;
+          tintedAmpm.bitmap.data[idx + 1] = C.white.g;
+          tintedAmpm.bitmap.data[idx + 2] = C.white.b;
+        }
+      });
+      const ampmX = timeX + timeWidth;
+      const ampmY = 1 + (7 - tintedAmpm.bitmap.height) - 2; // bottom-align with time text, shifted up 2px
+      image.composite(tintedAmpm, Math.floor(ampmX), Math.floor(ampmY));
+    }
   }
   
   await pasteTextColored(image, dayStr, dayX, 1, 7, C.accent.r, C.accent.g, C.accent.b);
@@ -1141,7 +1148,7 @@ function remapFrameToPalette(frame, palette) {
 }
 
 // Generate the animated GIF
-async function generateGIF(weatherData, outputFile = './weather-forecast.gif') {
+async function generateGIF(weatherData, outputFile = './weather-forecast.gif', showTime = true) {
   const currentData = weatherData.currently;
   const dailyData = weatherData.daily.data;
 
@@ -1157,7 +1164,7 @@ async function generateGIF(weatherData, outputFile = './weather-forecast.gif') {
   let lastGoodFrame = blankFrame;
   for (let i = 0; i < 6; i++) {
     try {
-      const frame = await createWeatherImage(currentData, dailyData, i);
+      const frame = await createWeatherImage(currentData, dailyData, i, showTime);
       lastGoodFrame = frame;
       rawFrames.push(frame);
     } catch (e) {
@@ -1398,7 +1405,7 @@ async function generateRadarGIF(outputFile, opts, overrideLocation) {
     const composited = radarBaseFramesCache[fi].clone();
 
     // Render date/time header with black background at top
-    await renderHeader(composited);
+    await renderHeader(composited, opts.show_time !== false);
 
     // Draw progress bar at bottom (2px tall, progressively wider)
     const C = FIXED_UI_COLORS;
@@ -1517,7 +1524,7 @@ async function main() {
       }
 
       console.log(`Generating weather GIF #${generationCount}...`);
-      await generateGIF(weatherData, outputFile);
+      await generateGIF(weatherData, outputFile, opts.show_time);
       console.log(`Weather done!`);
     } catch (error) {
       console.error('Weather error:', error.message);
