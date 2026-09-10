@@ -20,7 +20,8 @@
     "weatheralerts_entity": "",
     "radar_zoom": 6,
     "show_time": true,
-    "date_format": "MM-DD"
+    "date_format": "MM-DD",
+    "time_format": "12h"
   },
   "schema": {
     "forecast_entity": "str",
@@ -28,6 +29,7 @@
     "weatheralerts_entity": "str?",
     "radar_zoom": "int(1,7)",
     "show_time": "bool",
-    "date_format": "str"
+    "date_format": "str",
+    "time_format": "list(12h|24h)"
   }
 }

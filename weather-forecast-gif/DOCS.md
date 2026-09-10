@@ -51,6 +51,10 @@ Examples:
 
 Default: `MM-DD`.
 
+### Time Format
+
+Selects between a 12-hour clock with AM/PM (`12h`) and a 24-hour clock (`24h`). In 24-hour mode the AM/PM indicator is omitted. Applies to the header clock (when **Show Time** is enabled) and to the radar map's per-frame timestamps. Default: `12h`.
+
 ## Endpoints
 
 The add-on runs a web server on port `6942`. The GIFs are served at:

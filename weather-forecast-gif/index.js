@@ -19,6 +19,7 @@ function loadOptions() {
     radar_zoom: parseInt(process.env.RADAR_ZOOM || '6'),
     show_time: process.env.SHOW_TIME !== 'false',
     date_format: process.env.DATE_FORMAT || 'MM-DD',
+    time_format: process.env.TIME_FORMAT || '12h',
   };
 }
 
@@ -336,14 +337,17 @@ async function fetchWeatherData(forecastEntity, stationEntity, alertsEntity) {
   return fetchWeatherFromHA(forecastEntity, stationEntity, alertsEntity);
 }
 
-// Format time short for display (HH:MM only)
-function formatTimeShort(timestamp) {
+// Format time short for display (HH:MM only). `format` is '12h' or '24h'.
+function formatTimeShort(timestamp, format = '12h') {
   const date = new Date(timestamp * 1000);
   let hour = date.getHours();
   const isPM = hour >= 12;
   const minute = String(date.getMinutes()).padStart(2, '0');
+  if (format === '24h') {
+    return { time: `${hour}:${minute}`, isPM, is24: true };
+  }
   hour = hour % 12 || 12; // Convert to 12-hour format
-  return { time: `${hour}:${minute}`, isPM };
+  return { time: `${hour}:${minute}`, isPM, is24: false };
 }
 
 // Format date for display using a configurable format string.
@@ -625,7 +629,7 @@ async function renderTemperatureBig(image, tempStr, x, y, r = 255, g = 255, b = 
 }
 
 // Render the date/time/day header onto an image (rows y=0..8, with divider at y=8)
-async function renderHeader(image, showTime = true, dateFormat = 'MM-DD') {
+async function renderHeader(image, showTime = true, dateFormat = 'MM-DD', timeFormat = '12h') {
   const C = FIXED_UI_COLORS;
 
   // Black background behind header (y=0 to y=9 inclusive, extra row for 2px legend)
@@ -670,7 +674,7 @@ async function renderHeader(image, showTime = true, dateFormat = 'MM-DD') {
 
   const now = Date.now() / 1000;
   const dateStr = formatDate(now, dateFormat);
-  const { time: timeStr, isPM } = formatTimeShort(now);
+  const { time: timeStr, isPM, is24 } = formatTimeShort(now, timeFormat);
   const dayStr = getDayOfWeek(now);
 
   const dateWidth = await measureTextWidth(dateStr, 7);
@@ -682,7 +686,7 @@ async function renderHeader(image, showTime = true, dateFormat = 'MM-DD') {
   let ampmGlyph = null;
   let ampmWidth = 0;
   try {
-    if (fs.existsSync(ampmPath)) {
+    if (!is24 && fs.existsSync(ampmPath)) {
       ampmGlyph = await Jimp.read(ampmPath);
       ampmWidth = ampmGlyph.bitmap.width + 1;
     }
@@ -743,7 +747,7 @@ function drawRainBar(image, x, yTop, height, pct, width = 1) {
 }
 
 // Create weather display image using Jimp at 64x64 pixel-perfect rendering
-async function createWeatherImage(currentData, dailyData, frameIndex = 0, showTime = true, dateFormat = 'MM-DD') {
+async function createWeatherImage(currentData, dailyData, frameIndex = 0, showTime = true, dateFormat = 'MM-DD', timeFormat = '12h') {
   const width = 64;
   const height = 64;
   const image = new Jimp(width, height, 0x000000ff); // Black background
@@ -769,7 +773,7 @@ async function createWeatherImage(currentData, dailyData, frameIndex = 0, showTi
   });
 
   const dateStr = formatDate(currentData.time, dateFormat);
-  const { time: timeStr, isPM } = formatTimeShort(Date.now() / 1000); // Use current system time
+  const { time: timeStr, isPM, is24 } = formatTimeShort(Date.now() / 1000, timeFormat); // Use current system time
   const dayStr = getDayOfWeek(currentData.time);
   
   const tempStr = Math.round(currentData.temperature) + '°';
@@ -785,7 +789,7 @@ async function createWeatherImage(currentData, dailyData, frameIndex = 0, showTi
   let ampmGlyph = null;
   let ampmWidth = 0;
   try {
-    if (fs.existsSync(ampmPath)) {
+    if (!is24 && fs.existsSync(ampmPath)) {
       ampmGlyph = await Jimp.read(ampmPath);
       ampmWidth = ampmGlyph.bitmap.width + 1; // 1px gap before glyph
     }
@@ -1154,7 +1158,7 @@ function remapFrameToPalette(frame, palette) {
 }
 
 // Generate the animated GIF
-async function generateGIF(weatherData, outputFile = './weather-forecast.gif', showTime = true, dateFormat = 'MM-DD') {
+async function generateGIF(weatherData, outputFile = './weather-forecast.gif', showTime = true, dateFormat = 'MM-DD', timeFormat = '12h') {
   const currentData = weatherData.currently;
   const dailyData = weatherData.daily.data;
 
@@ -1170,7 +1174,7 @@ async function generateGIF(weatherData, outputFile = './weather-forecast.gif', s
   let lastGoodFrame = blankFrame;
   for (let i = 0; i < 6; i++) {
     try {
-      const frame = await createWeatherImage(currentData, dailyData, i, showTime, dateFormat);
+      const frame = await createWeatherImage(currentData, dailyData, i, showTime, dateFormat, timeFormat);
       lastGoodFrame = frame;
       rawFrames.push(frame);
     } catch (e) {
@@ -1411,7 +1415,7 @@ async function generateRadarGIF(outputFile, opts, overrideLocation) {
     const composited = radarBaseFramesCache[fi].clone();
 
     // Render date/time header with black background at top
-    await renderHeader(composited, opts.show_time !== false, opts.date_format || 'MM-DD');
+    await renderHeader(composited, opts.show_time !== false, opts.date_format || 'MM-DD', opts.time_format || '12h');
 
     // Draw progress bar at bottom (2px tall, progressively wider)
     const C = FIXED_UI_COLORS;
@@ -1423,12 +1427,26 @@ async function generateRadarGIF(outputFile, opts, overrideLocation) {
       composited.bitmap.data[idx + 3] = 255;
     });
 
-    // Render radar frame timestamp in lower-left (24hr format)
-    const frameDate = new Date(radarFrameTimestamps[fi] * 1000);
-    const frameHH = String(frameDate.getHours()).padStart(2, '0');
-    const frameMM = String(frameDate.getMinutes()).padStart(2, '0');
-    const frameTimeStr = `${frameHH}:${frameMM}`;
+    // Render radar frame timestamp in lower-left, respecting the time format
+    const { time: frameTimeStr, isPM: framePM, is24: frameIs24 } = formatTimeShort(radarFrameTimestamps[fi], opts.time_format || '12h');
     await pasteTextColored(composited, frameTimeStr, 1, 55, 6, C.forecastLow.r, C.forecastLow.g, C.forecastLow.b);
+
+    // In 12-hour mode, append the AM/PM indicator after the timestamp
+    if (!frameIs24) {
+      const frameAmpmPath = path.join(__dirname, 'punctuation', framePM ? 'pm.png' : 'am.png');
+      if (fs.existsSync(frameAmpmPath)) {
+        const frameTimeWidth = await measureTextWidth(frameTimeStr, 6);
+        const frameAmpm = (await Jimp.read(frameAmpmPath)).clone();
+        frameAmpm.scan(0, 0, frameAmpm.bitmap.width, frameAmpm.bitmap.height, (px, py, idx) => {
+          if (frameAmpm.bitmap.data[idx + 3] > 0) {
+            frameAmpm.bitmap.data[idx] = C.forecastLow.r;
+            frameAmpm.bitmap.data[idx + 1] = C.forecastLow.g;
+            frameAmpm.bitmap.data[idx + 2] = C.forecastLow.b;
+          }
+        });
+        composited.composite(frameAmpm, 1 + frameTimeWidth + 1, 55);
+      }
+    }
 
     radarImages.push(composited);
   }
@@ -1530,7 +1548,7 @@ async function main() {
       }
 
       console.log(`Generating weather GIF #${generationCount}...`);
-      await generateGIF(weatherData, outputFile, opts.show_time, opts.date_format);
+      await generateGIF(weatherData, outputFile, opts.show_time, opts.date_format, opts.time_format);
       console.log(`Weather done!`);
     } catch (error) {
       console.error('Weather error:', error.message);

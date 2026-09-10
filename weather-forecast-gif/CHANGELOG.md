@@ -4,6 +4,8 @@
 
 - Add `show_time` option to hide the time in the header, leaving only the date and day of week
 - Add `date_format` option to configure the header date (e.g. `MM-DD`, `DD.MM.`, `MM/DD`)
+- Add `time_format` option to choose between 12-hour and 24-hour clock display
+- Apply the time format to the radar map's per-frame timestamps, including AM/PM in 12-hour mode
 
 ## 2026.07.27.0
 
