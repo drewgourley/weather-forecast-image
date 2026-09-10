@@ -39,6 +39,18 @@ Map zoom level for the radar view (1–7). Lower values show a wider area; highe
 
 Whether to render the current time in the header row. When enabled (the default), the header shows the date, time, and day of week. Set to `false` to show only the date and day of week — useful when the GIF stays on the display for a long time and a static clock would become misleading. Default: `true`.
 
+### Date Format
+
+Controls how the date is displayed in the header. Use `MM` for the month and `DD` for the day; any other characters (such as `-`, `.`, or `/`) are rendered as literal separators. Years are not supported because of the limited header width.
+
+Examples:
+
+- `MM-DD` → `08•20` (default)
+- `DD.MM.` → `20.08.`
+- `MM/DD` → `08/20`
+
+Default: `MM-DD`.
+
 ## Endpoints
 
 The add-on runs a web server on port `6942`. The GIFs are served at:

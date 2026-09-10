@@ -18,6 +18,7 @@ function loadOptions() {
     weatheralerts_entity: process.env.WEATHERALERTS_ENTITY || '',
     radar_zoom: parseInt(process.env.RADAR_ZOOM || '6'),
     show_time: process.env.SHOW_TIME !== 'false',
+    date_format: process.env.DATE_FORMAT || 'MM-DD',
   };
 }
 
@@ -276,7 +277,7 @@ async function loadGlyph(char) {
   } else if (char === ' ') {
     folder = path.resolve(__dirname, 'letters');
     filename = 'space.png';
-  } else if (char === '•') {
+  } else if (char === '•' || char === '-') {
     folder = path.resolve(__dirname, 'punctuation');
     filename = 'dash.png'; // Centered dot for date separator
   } else if (char === '.') {
@@ -345,12 +346,17 @@ function formatTimeShort(timestamp) {
   return { time: `${hour}:${minute}`, isPM };
 }
 
-// Format date for display (MM•DD format)
-function formatDate(timestamp) {
+// Format date for display using a configurable format string.
+// Tokens: MM (month), DD (day). Any other characters (e.g. '-', '.', '/') are
+// rendered as literal separators. Year is unsupported due to header space limits.
+function formatDate(timestamp, format = 'MM-DD') {
   const date = new Date(timestamp * 1000);
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
-  return `${month}•${day}`;
+  return format
+    .replace(/Y/gi, '') // strip any year tokens; not supported
+    .replace(/MM/g, month)
+    .replace(/DD/g, day);
 }
 
 // Get day of week abbreviation (MON, TUE, WED, etc.)
@@ -619,7 +625,7 @@ async function renderTemperatureBig(image, tempStr, x, y, r = 255, g = 255, b = 
 }
 
 // Render the date/time/day header onto an image (rows y=0..8, with divider at y=8)
-async function renderHeader(image, showTime = true) {
+async function renderHeader(image, showTime = true, dateFormat = 'MM-DD') {
   const C = FIXED_UI_COLORS;
 
   // Black background behind header (y=0 to y=9 inclusive, extra row for 2px legend)
@@ -663,7 +669,7 @@ async function renderHeader(image, showTime = true) {
   }
 
   const now = Date.now() / 1000;
-  const dateStr = formatDate(now);
+  const dateStr = formatDate(now, dateFormat);
   const { time: timeStr, isPM } = formatTimeShort(now);
   const dayStr = getDayOfWeek(now);
 
@@ -737,7 +743,7 @@ function drawRainBar(image, x, yTop, height, pct, width = 1) {
 }
 
 // Create weather display image using Jimp at 64x64 pixel-perfect rendering
-async function createWeatherImage(currentData, dailyData, frameIndex = 0, showTime = true) {
+async function createWeatherImage(currentData, dailyData, frameIndex = 0, showTime = true, dateFormat = 'MM-DD') {
   const width = 64;
   const height = 64;
   const image = new Jimp(width, height, 0x000000ff); // Black background
@@ -762,7 +768,7 @@ async function createWeatherImage(currentData, dailyData, frameIndex = 0, showTi
     image.bitmap.data[idx + 3] = 255;
   });
 
-  const dateStr = formatDate(currentData.time);
+  const dateStr = formatDate(currentData.time, dateFormat);
   const { time: timeStr, isPM } = formatTimeShort(Date.now() / 1000); // Use current system time
   const dayStr = getDayOfWeek(currentData.time);
   
@@ -1148,7 +1154,7 @@ function remapFrameToPalette(frame, palette) {
 }
 
 // Generate the animated GIF
-async function generateGIF(weatherData, outputFile = './weather-forecast.gif', showTime = true) {
+async function generateGIF(weatherData, outputFile = './weather-forecast.gif', showTime = true, dateFormat = 'MM-DD') {
   const currentData = weatherData.currently;
   const dailyData = weatherData.daily.data;
 
@@ -1164,7 +1170,7 @@ async function generateGIF(weatherData, outputFile = './weather-forecast.gif', s
   let lastGoodFrame = blankFrame;
   for (let i = 0; i < 6; i++) {
     try {
-      const frame = await createWeatherImage(currentData, dailyData, i, showTime);
+      const frame = await createWeatherImage(currentData, dailyData, i, showTime, dateFormat);
       lastGoodFrame = frame;
       rawFrames.push(frame);
     } catch (e) {
@@ -1405,7 +1411,7 @@ async function generateRadarGIF(outputFile, opts, overrideLocation) {
     const composited = radarBaseFramesCache[fi].clone();
 
     // Render date/time header with black background at top
-    await renderHeader(composited, opts.show_time !== false);
+    await renderHeader(composited, opts.show_time !== false, opts.date_format || 'MM-DD');
 
     // Draw progress bar at bottom (2px tall, progressively wider)
     const C = FIXED_UI_COLORS;
@@ -1524,7 +1530,7 @@ async function main() {
       }
 
       console.log(`Generating weather GIF #${generationCount}...`);
-      await generateGIF(weatherData, outputFile, opts.show_time);
+      await generateGIF(weatherData, outputFile, opts.show_time, opts.date_format);
       console.log(`Weather done!`);
     } catch (error) {
       console.error('Weather error:', error.message);

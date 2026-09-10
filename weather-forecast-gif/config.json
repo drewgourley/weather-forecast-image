@@ -19,13 +19,15 @@
     "station_entity": "",
     "weatheralerts_entity": "",
     "radar_zoom": 6,
-    "show_time": true
+    "show_time": true,
+    "date_format": "MM-DD"
   },
   "schema": {
     "forecast_entity": "str",
     "station_entity": "str?",
     "weatheralerts_entity": "str?",
     "radar_zoom": "int(1,7)",
-    "show_time": "bool"
+    "show_time": "bool",
+    "date_format": "str"
   }
 }

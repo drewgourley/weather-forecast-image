@@ -7,6 +7,7 @@ export STATION_ENTITY=$(bashio::config 'station_entity')
 export WEATHERALERTS_ENTITY=$(bashio::config 'weatheralerts_entity')
 export RADAR_ZOOM=$(bashio::config 'radar_zoom')
 export SHOW_TIME=$(bashio::config 'show_time')
+export DATE_FORMAT=$(bashio::config 'date_format')
 
 cd /
 npm run start

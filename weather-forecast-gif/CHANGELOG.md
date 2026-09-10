@@ -3,6 +3,7 @@
 ## 2026.09.09.0
 
 - Add `show_time` option to hide the time in the header, leaving only the date and day of week
+- Add `date_format` option to configure the header date (e.g. `MM-DD`, `DD.MM.`, `MM/DD`)
 
 ## 2026.07.27.0
 
