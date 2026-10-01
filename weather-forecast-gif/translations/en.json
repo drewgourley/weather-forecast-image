@@ -27,6 +27,10 @@
     "time_format": {
       "name": "Time Format",
       "description": "12-hour clock with AM/PM (12h) or 24-hour clock (24h). Also applies to the radar frame timestamps. Default: 12h."
+    },
+    "cartodb_api_key": {
+      "name": "CARTO API Key",
+      "description": "API key for the CARTO basemap tiles used behind the radar map. CARTO now requires a key for its basemaps; create a free key at carto.com and paste it here. Leave empty to request tiles without a key (may fail if CARTO rejects anonymous requests)."
     }
   }
 }

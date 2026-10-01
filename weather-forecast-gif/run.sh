@@ -9,6 +9,7 @@ export RADAR_ZOOM=$(bashio::config 'radar_zoom')
 export SHOW_TIME=$(bashio::config 'show_time')
 export DATE_FORMAT=$(bashio::config 'date_format')
 export TIME_FORMAT=$(bashio::config 'time_format')
+export CARTODB_API_KEY=$(bashio::config 'cartodb_api_key')
 
 cd /
 npm run start

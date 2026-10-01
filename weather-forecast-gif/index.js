@@ -20,6 +20,7 @@ function loadOptions() {
     show_time: process.env.SHOW_TIME !== 'false',
     date_format: process.env.DATE_FORMAT || 'MM-DD',
     time_format: process.env.TIME_FORMAT || '12h',
+    cartodb_api_key: process.env.CARTODB_API_KEY || '',
   };
 }
 
@@ -1260,8 +1261,9 @@ function latLonToTile(lat, lon, zoom) {
 }
 
 // Download a map tile from CartoDB dark basemap (label-free for 64px clarity)
-async function downloadMapTile(z, x, y) {
-  const url = `https://basemaps.cartocdn.com/dark_nolabels/${z}/${x}/${y}.png`;
+async function downloadMapTile(z, x, y, apiKey) {
+  let url = `https://basemaps.cartocdn.com/dark_nolabels/${z}/${x}/${y}.png`;
+  if (apiKey) url += `?api_key=${encodeURIComponent(apiKey)}`;
   const res = await fetch(url, {
     headers: { 'User-Agent': 'WeatherForecastGIF-HomeAssistant/1.0' },
   });
@@ -1349,7 +1351,7 @@ async function generateRadarGIF(outputFile, opts, overrideLocation) {
     console.log('  Using cached map background');
   } else {
     console.log('  Downloading map background tiles...');
-    mapBackground = await fetchCenteredTiles(latitude, longitude, zoom, downloadMapTile);
+    mapBackground = await fetchCenteredTiles(latitude, longitude, zoom, (z, x, y) => downloadMapTile(z, x, y, opts.cartodb_api_key));
     mapTileCache = mapBackground;
     mapTileCacheKey = cacheKey;
   }

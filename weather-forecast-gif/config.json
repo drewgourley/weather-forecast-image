@@ -1,7 +1,7 @@
 {
   "name": "Weather Forecast GIF",
   "description": "Generates an animated 64x64 weather forecast GIF from Home Assistant weather entities, designed for Divoom Pixoo 64 and similar pixel displays",
-  "version": "2026.09.10.0",
+  "version": "2026.09.30.0",
   "slug": "weather_forecast_gif",
   "url": "https://github.com/drewgourley/weather-forecast-image",
   "arch": ["armhf", "armv7", "aarch64", "amd64", "i386"],
@@ -21,7 +21,8 @@
     "radar_zoom": 6,
     "show_time": true,
     "date_format": "MM-DD",
-    "time_format": "12h"
+    "time_format": "12h",
+    "cartodb_api_key": ""
   },
   "schema": {
     "forecast_entity": "str",
@@ -30,6 +31,7 @@
     "radar_zoom": "int(1,7)",
     "show_time": "bool",
     "date_format": "str",
-    "time_format": "list(12h|24h)"
+    "time_format": "list(12h|24h)",
+    "cartodb_api_key": "str?"
   }
 }
