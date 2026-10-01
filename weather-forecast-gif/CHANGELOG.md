@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026.09.30.0
+## 2026.09.30.1
 
 - Add `cartodb_api_key` option to authenticate the radar basemap tile requests, which CARTO now requires
 

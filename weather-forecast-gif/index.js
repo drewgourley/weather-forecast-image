@@ -1263,7 +1263,7 @@ function latLonToTile(lat, lon, zoom) {
 // Download a map tile from CartoDB dark basemap (label-free for 64px clarity)
 async function downloadMapTile(z, x, y, apiKey) {
   let url = `https://basemaps.cartocdn.com/dark_nolabels/${z}/${x}/${y}.png`;
-  if (apiKey) url += `?api_key=${encodeURIComponent(apiKey)}`;
+  if (apiKey) url += `?key=${encodeURIComponent(apiKey)}`;
   const res = await fetch(url, {
     headers: { 'User-Agent': 'WeatherForecastGIF-HomeAssistant/1.0' },
   });

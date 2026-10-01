@@ -57,7 +57,7 @@ Selects between a 12-hour clock with AM/PM (`12h`) and a 24-hour clock (`24h`). 
 
 ### CARTO API Key
 
-The radar map's dark basemap tiles come from [CARTO](https://carto.com/), which now requires an API key for its basemaps. Create a free key in your CARTO account and paste it here; it is appended to each tile request as `?api_key=…`. Leave empty to request tiles without a key (this may fail if CARTO rejects anonymous requests). Default: empty.
+The radar map's dark basemap tiles come from [CARTO](https://carto.com/), which now requires an API key for its basemaps. Create a free key in your CARTO account and paste it here; it is appended to each tile request as `?key=…`. Leave empty to request tiles without a key (this may fail if CARTO rejects anonymous requests). Default: empty.
 
 ## Endpoints
 
